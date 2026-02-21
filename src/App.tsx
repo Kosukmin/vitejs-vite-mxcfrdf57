@@ -181,6 +181,39 @@ export default function GanttChart() {
       return oa!==ob ? oa-ob : a.id-b.id;
     });
 
+  const exportCSV = () => {
+    const headers = ['카테고리','프로젝트','오너','프로젝트 시작일','프로젝트 종료일','프로젝트 진행률','프로젝트 설명','Task','Task 설명','담당자','Task 시작일','Task 종료일','Task 진행률'];
+    const escape = (v: any) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+    const rows: string[][] = [];
+
+    // 화면과 동일한 정렬 순서 적용
+    const sorted = [...projects]
+      .filter(p => activeCategories.length===0 || activeCategories.includes(p.category))
+      .sort((a,b) => {
+        const oa=CATEGORY_ORDER[a.category]??99, ob=CATEGORY_ORDER[b.category]??99;
+        return oa!==ob ? oa-ob : a.id-b.id;
+      });
+
+    sorted.forEach(proj => {
+      const { progress: projProg } = getProjectMeta(proj);
+      const base = [proj.category||'', proj.name, proj.owner||'', proj.startDate||'', proj.endDate||'', `${projProg}%`, proj.description||''];
+      if (proj.tasks.length === 0) {
+        rows.push([...base, '', '', '', '', '', '']);
+      } else {
+        proj.tasks.forEach((t: any) => {
+          rows.push([...base, t.name, t.description||'', t.assignee||'', t.startDate||'', t.endDate||'', `${t.progress||0}%`]);
+        });
+      }
+    });
+
+    const csv = [headers, ...rows].map(r => r.map(escape).join(',')).join('\n');
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `샌디버스_간트차트_${new Date().toISOString().slice(0,10)}.csv`;
+    a.click(); URL.revokeObjectURL(url);
+  };
+
   const today=new Date();
   const todayLeft = today>=CHART_START && today<=CHART_END
     ? Math.round((today.getTime()-CHART_START.getTime())/86400000/TOTAL_DAYS*TIMELINE_W) : null;
@@ -343,6 +376,9 @@ export default function GanttChart() {
                 style={{paddingLeft:32,paddingRight:12,paddingTop:8,paddingBottom:8,border:'1px solid #d1d5db',borderRadius:8,width:200,fontSize:14,outline:'none'}} />
             </div>
             <button onClick={load} style={{padding:'8px 12px',border:'1px solid #d1d5db',borderRadius:8,background:'white',cursor:'pointer',fontSize:14}} title="새로고침">🔄</button>
+            <button onClick={exportCSV} style={{display:'flex',alignItems:'center',gap:6,padding:'8px 14px',background:'#16a34a',color:'white',border:'none',borderRadius:8,cursor:'pointer',fontSize:14,fontWeight:500}}>
+              ⬇ CSV
+            </button>
             <button onClick={addProject} style={{display:'flex',alignItems:'center',gap:6,padding:'8px 16px',background:'#3b82f6',color:'white',border:'none',borderRadius:8,cursor:'pointer',fontSize:14,fontWeight:500}}>
               + 프로젝트 추가
             </button>
