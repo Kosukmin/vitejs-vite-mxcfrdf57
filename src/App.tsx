@@ -11,8 +11,6 @@ const CHART_END   = new Date('2026-12-31T00:00:00');
 const TOTAL_DAYS  = (CHART_END.getTime() - CHART_START.getTime()) / 86400000;
 const MONTHS = ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
 
-// ✅ 비율 기반 컬럼 계산
-// 전체 너비 기준: 프로젝트열 40%, 담당자열 8%, 타임라인 52% (최솟값 보장)
 const calcCols = (w: number) => {
   const leftCol     = Math.max(260, Math.floor(w * 0.30));
   const assigneeCol = Math.max(64,  Math.floor(w * 0.07));
@@ -30,18 +28,19 @@ const COLOR_MAP: Record<string, any> = {
   pink:   { bar:'#ec4899', barLight:'#fbcfe8', text:'#be185d', border:'#ec4899', rowBg:'#fef7fb' },
 };
 
+// ✅ 카테고리 4개로 확장: 영업 / 기획 / 운영 / 개발
 const CATEGORY_COLORS: Record<string, any> = {
   '영업': { bg:'#fef3c7', text:'#92400e', border:'#f59e0b' },
   '기획': { bg:'#ede9fe', text:'#5b21b6', border:'#7c3aed' },
+  '운영': { bg:'#e0f2fe', text:'#075985', border:'#0ea5e9' },
   '개발': { bg:'#d1fae5', text:'#065f46', border:'#10b981' },
 };
-const CATEGORY_ORDER: Record<string, number> = { '영업':0, '기획':1, '개발':2 };
+const CATEGORY_ORDER: Record<string, number> = { '영업':0, '기획':1, '운영':2, '개발':3 };
 
 const toDateStr = (d: Date) => d.toISOString().split('T')[0];
 const parseDate = (s: string) => new Date(s + 'T00:00:00');
 
 export default function GanttChart() {
-  // ✅ 모든 컬럼 너비를 하나의 state로
   const [cols, setCols] = useState(() => calcCols(window.innerWidth));
   const { leftCol: LEFT_COL, assigneeCol: ASSIGNEE_COL, monthCol: MONTH_COL, timelineW: TIMELINE_W } = cols;
 
@@ -57,7 +56,6 @@ export default function GanttChart() {
   const [tooltipPos, setTooltipPos]     = useState({ x:0, y:0 });
   const dragRef = useRef<any>(null);
 
-  // ✅ resize 감지
   useEffect(() => {
     const onResize = () => setCols(calcCols(window.innerWidth));
     window.addEventListener('resize', onResize);
@@ -185,15 +183,12 @@ export default function GanttChart() {
     const headers = ['카테고리','프로젝트','오너','프로젝트 시작일','프로젝트 종료일','프로젝트 진행률','프로젝트 설명','Task','Task 설명','담당자','Task 시작일','Task 종료일','Task 진행률'];
     const escape = (v: any) => `"${String(v ?? '').replace(/"/g, '""')}"`;
     const rows: string[][] = [];
-
-    // 화면과 동일한 정렬 순서 적용
     const sorted = [...projects]
       .filter(p => activeCategories.length===0 || activeCategories.includes(p.category))
       .sort((a,b) => {
         const oa=CATEGORY_ORDER[a.category]??99, ob=CATEGORY_ORDER[b.category]??99;
         return oa!==ob ? oa-ob : a.id-b.id;
       });
-
     sorted.forEach(proj => {
       const { progress: projProg } = getProjectMeta(proj);
       const base = [proj.category||'', proj.name, proj.owner||'', proj.startDate||'', proj.endDate||'', `${projProg}%`, proj.description||''];
@@ -205,7 +200,6 @@ export default function GanttChart() {
         });
       }
     });
-
     const csv = [headers, ...rows].map(r => r.map(escape).join(',')).join('\n');
     const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
@@ -218,10 +212,11 @@ export default function GanttChart() {
   const todayLeft = today>=CHART_START && today<=CHART_END
     ? Math.round((today.getTime()-CHART_START.getTime())/86400000/TOTAL_DAYS*TIMELINE_W) : null;
 
-  // ✅ 반응형 모달 너비 계산
   const modalW = Math.min(500, Math.max(320, window.innerWidth * 0.9));
-
   const inp = (extra={}) => ({width:'100%',border:'1px solid #d1d5db',borderRadius:8,padding:'8px 12px',fontSize:14,boxSizing:'border-box' as const,...extra});
+
+  // ✅ 카테고리 목록 상수 (모달/필터 공통 사용)
+  const CATEGORIES = ['영업','기획','운영','개발'];
 
   const ProjectEditModal = ({ proj, onClose }: any) => {
     const [fd, setFd] = useState({...proj});
@@ -244,7 +239,8 @@ export default function GanttChart() {
             <div>
               <label style={{display:'block',fontSize:14,fontWeight:500,marginBottom:8}}>카테고리</label>
               <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
-                {['영업','기획','개발'].map(cat=>{
+                {/* ✅ 4개 카테고리 렌더링 */}
+                {CATEGORIES.map(cat=>{
                   const cc=CATEGORY_COLORS[cat];
                   return <button key={cat} onClick={()=>setFd({...fd,category:cat})}
                     style={{padding:'6px 16px',borderRadius:20,border:`2px solid ${fd.category===cat?cc.border:'#e5e7eb'}`,background:fd.category===cat?cc.bg:'white',color:fd.category===cat?cc.text:'#6b7280',cursor:'pointer',fontSize:13,fontWeight:fd.category===cat?600:400}}>{cat}</button>;
@@ -384,14 +380,15 @@ export default function GanttChart() {
             </button>
           </div>
         </div>
-        {/* 카테고리 필터 */}
+
+        {/* ✅ 카테고리 필터 - 4개 */}
         <div style={{display:'flex',gap:8,marginTop:12,alignItems:'center',flexWrap:'wrap'}}>
           <button onClick={()=>setActiveCategories([])}
             style={{padding:'6px 18px',borderRadius:20,fontSize:13,cursor:'pointer',fontWeight:activeCategories.length===0?600:400,border:activeCategories.length===0?'2px solid #3b82f6':'2px solid #e5e7eb',background:activeCategories.length===0?'#eff6ff':'white',color:activeCategories.length===0?'#1d4ed8':'#6b7280'}}>
             전체 <span style={{marginLeft:4,fontSize:11,opacity:0.7}}>{projects.length}</span>
           </button>
           <div style={{width:1,height:20,background:'#e5e7eb'}} />
-          {['영업','기획','개발'].map(cat=>{
+          {CATEGORIES.map(cat=>{
             const isActive=activeCategories.includes(cat);
             const cc=CATEGORY_COLORS[cat];
             return (
