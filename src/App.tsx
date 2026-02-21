@@ -309,16 +309,20 @@ export default function GanttChart() {
   if (loading) return (
     <div style={{display:'flex',alignItems:'center',justifyContent:'center',height:'100vh',flexDirection:'column',gap:12,color:'#6b7280'}}>
       <div style={{width:32,height:32,border:'4px solid #93c5fd',borderTopColor:'transparent',borderRadius:'50%',animation:'spin 0.8s linear infinite'}} />
-      <p style={{fontSize:14,margin:0}}>Supabase에서 불러오는 중...</p>
-      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+      <p style={{fontSize:14,margin:0,fontFamily:"'Pretendard',-apple-system,BlinkMacSystemFont,sans-serif"}}>Supabase에서 불러오는 중...</p>
+      <style>{`@import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css'); @keyframes spin{to{transform:rotate(360deg)}}`}</style>
     </div>
   );
 
   const totalW = LEFT_COL + ASSIGNEE_COL + TIMELINE_W;
 
   return (
-    <div style={{minHeight:'100vh',width:'100%',background:'#f3f4f6',display:'flex',flexDirection:'column',fontFamily:'-apple-system,BlinkMacSystemFont,sans-serif'}}>
-      <style>{`@keyframes spin{to{transform:rotate(360deg)}} *{box-sizing:border-box}`}</style>
+    <div style={{minHeight:'100vh',width:'100%',background:'#f3f4f6',display:'flex',flexDirection:'column',fontFamily:"'Pretendard',-apple-system,BlinkMacSystemFont,sans-serif"}}>
+      <style>{`
+        @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
+        @keyframes spin{to{transform:rotate(360deg)}}
+        *{box-sizing:border-box; font-family:'Pretendard',-apple-system,BlinkMacSystemFont,sans-serif;}
+      `}</style>
 
       {/* Header */}
       <div style={{background:'white',borderBottom:'1px solid #e5e7eb',padding:'16px 24px',flexShrink:0,boxShadow:'0 1px 3px rgba(0,0,0,0.05)'}}>
