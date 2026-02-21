@@ -28,7 +28,6 @@ const COLOR_MAP: Record<string, any> = {
   pink:   { bar:'#ec4899', barLight:'#fbcfe8', text:'#be185d', border:'#ec4899', rowBg:'#fef7fb' },
 };
 
-// ✅ 카테고리 4개로 확장: 영업 / 기획 / 운영 / 개발
 const CATEGORY_COLORS: Record<string, any> = {
   '영업': { bg:'#fef3c7', text:'#92400e', border:'#f59e0b' },
   '기획': { bg:'#ede9fe', text:'#5b21b6', border:'#7c3aed' },
@@ -36,9 +35,12 @@ const CATEGORY_COLORS: Record<string, any> = {
   '개발': { bg:'#d1fae5', text:'#065f46', border:'#10b981' },
 };
 const CATEGORY_ORDER: Record<string, number> = { '영업':0, '기획':1, '운영':2, '개발':3 };
+const CATEGORIES = ['영업','기획','운영','개발'];
 
 const toDateStr = (d: Date) => d.toISOString().split('T')[0];
 const parseDate = (s: string) => new Date(s + 'T00:00:00');
+const todayStr = () => toDateStr(new Date());
+const weekLaterStr = () => { const d = new Date(); d.setDate(d.getDate() + 7); return toDateStr(d); };
 
 export default function GanttChart() {
   const [cols, setCols] = useState(() => calcCols(window.innerWidth));
@@ -92,13 +94,13 @@ export default function GanttChart() {
   const addProject = () => save([...projects, {
     id:Date.now(), name:'새 프로젝트', owner:'', description:'',
     color:'blue', expanded:true, tasks:[], category:'기획',
-    startDate:'', endDate:'', progress:0
+    startDate:todayStr(), endDate:weekLaterStr(), progress:0
   }]);
 
   const addTask = (pid: number) => save(projects.map(p => p.id !== pid ? p : {
     ...p, tasks:[...p.tasks, {
       id:Date.now(), name:'새 Task', assignee:'',
-      startDate:'2026-03-01', endDate:'2026-05-31',
+      startDate:todayStr(), endDate:weekLaterStr(),
       progress:0, dependencies:[], description:''
     }]
   }));
@@ -215,9 +217,6 @@ export default function GanttChart() {
   const modalW = Math.min(500, Math.max(320, window.innerWidth * 0.9));
   const inp = (extra={}) => ({width:'100%',border:'1px solid #d1d5db',borderRadius:8,padding:'8px 12px',fontSize:14,boxSizing:'border-box' as const,...extra});
 
-  // ✅ 카테고리 목록 상수 (모달/필터 공통 사용)
-  const CATEGORIES = ['영업','기획','운영','개발'];
-
   const ProjectEditModal = ({ proj, onClose }: any) => {
     const [fd, setFd] = useState({...proj});
     const colorOpts = [
@@ -239,7 +238,6 @@ export default function GanttChart() {
             <div>
               <label style={{display:'block',fontSize:14,fontWeight:500,marginBottom:8}}>카테고리</label>
               <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
-                {/* ✅ 4개 카테고리 렌더링 */}
                 {CATEGORIES.map(cat=>{
                   const cc=CATEGORY_COLORS[cat];
                   return <button key={cat} onClick={()=>setFd({...fd,category:cat})}
@@ -380,8 +378,7 @@ export default function GanttChart() {
             </button>
           </div>
         </div>
-
-        {/* ✅ 카테고리 필터 - 4개 */}
+        {/* 카테고리 필터 */}
         <div style={{display:'flex',gap:8,marginTop:12,alignItems:'center',flexWrap:'wrap'}}>
           <button onClick={()=>setActiveCategories([])}
             style={{padding:'6px 18px',borderRadius:20,fontSize:13,cursor:'pointer',fontWeight:activeCategories.length===0?600:400,border:activeCategories.length===0?'2px solid #3b82f6':'2px solid #e5e7eb',background:activeCategories.length===0?'#eff6ff':'white',color:activeCategories.length===0?'#1d4ed8':'#6b7280'}}>
