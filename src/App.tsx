@@ -46,16 +46,20 @@ export default function GanttChart() {
   const [cols, setCols] = useState(() => calcCols(window.innerWidth));
   const { leftCol: LEFT_COL, assigneeCol: ASSIGNEE_COL, monthCol: MONTH_COL, timelineW: TIMELINE_W } = cols;
 
-  const [projects, setProjects]         = useState<any[]>([]);
-  const [searchQuery, setSearchQuery]   = useState('');
+  const [projects, setProjects]               = useState<any[]>([]);
+  const [searchQuery, setSearchQuery]         = useState('');
   const [activeCategories, setActiveCategories] = useState<string[]>([]);
-  const [loading, setLoading]           = useState(true);
-  const [saving, setSaving]             = useState(false);
-  const [editingTask, setEditingTask]   = useState<any>(null);
-  const [editingProject, setEditingProject] = useState<any>(null);
-  const [dragging, setDragging]         = useState<any>(null);
-  const [tooltip, setTooltip]           = useState<any>(null);
-  const [tooltipPos, setTooltipPos]     = useState({ x:0, y:0 });
+  const [activeGroup, setActiveGroup]         = useState('');
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+  const [loading, setLoading]                 = useState(true);
+  const [saving, setSaving]                   = useState(false);
+  const [editingTask, setEditingTask]         = useState<any>(null);
+  const [editingProject, setEditingProject]   = useState<any>(null);
+  const [editingGroupName, setEditingGroupName] = useState<string|null>(null);
+  const [editingGroupValue, setEditingGroupValue] = useState('');
+  const [dragging, setDragging]               = useState<any>(null);
+  const [tooltip, setTooltip]                 = useState<any>(null);
+  const [tooltipPos, setTooltipPos]           = useState({ x:0, y:0 });
   const dragRef = useRef<any>(null);
 
   useEffect(() => {
@@ -94,6 +98,7 @@ export default function GanttChart() {
   const addProject = () => save([...projects, {
     id:Date.now(), name:'새 프로젝트', owner:'', description:'',
     color:'blue', expanded:true, tasks:[], category:'기획',
+    group: activeGroup || '미분류',
     startDate:todayStr(), endDate:weekLaterStr(), progress:0
   }]);
 
@@ -110,6 +115,15 @@ export default function GanttChart() {
   const deleteTask     = (pid: number, tid: number) => save(projects.map(p => p.id!==pid ? p : {...p, tasks:p.tasks.filter((t:any)=>t.id!==tid)}));
   const deleteProject  = (pid: number) => save(projects.filter(p => p.id!==pid));
   const updateProject  = (pid: number, upd: any) => save(projects.map(p => p.id!==pid ? p : {...p,...upd}));
+
+  const toggleGroup = (g: string) => setCollapsedGroups(prev => {
+    const next = new Set(prev); next.has(g) ? next.delete(g) : next.add(g); return next;
+  });
+
+  const renameGroup = (oldName: string, newName: string) => {
+    if (!newName.trim() || newName === oldName) return;
+    save(projects.map(p => p.group === oldName ? {...p, group: newName.trim()} : p));
+  };
 
   const getProjectMeta = (proj: any) => {
     const tasks = proj.tasks.filter((t:any) => t.startDate && t.endDate);
@@ -169,8 +183,17 @@ export default function GanttChart() {
     return () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
   }, [dragging, TIMELINE_W]);
 
+  const allGroups = Array.from(new Set(projects.map(p => p.group || '미분류')))
+  .sort((a, b) => {
+    if (a === '미분류') return -1;
+    if (b === '미분류') return 1;
+    return a.localeCompare(b, 'ko');
+  });
+
+
   const filtered = projects
     .filter(p => activeCategories.length===0 || activeCategories.includes(p.category))
+    .filter(p => activeGroup==='' || (p.group||'미분류')===activeGroup)
     .filter(p =>
       p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       p.owner?.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -181,27 +204,32 @@ export default function GanttChart() {
       return oa!==ob ? oa-ob : a.id-b.id;
     });
 
+  const groupedFiltered = allGroups
+    .filter(g => activeGroup==='' || g===activeGroup)
+    .map(g => ({ name:g, items: filtered.filter(p=>(p.group||'미분류')===g) }))
+    .filter(g => g.items.length > 0);
+
   const exportCSV = () => {
-    const headers = ['카테고리','프로젝트','오너','프로젝트 시작일','프로젝트 종료일','프로젝트 진행률','프로젝트 설명','Task','Task 설명','담당자','Task 시작일','Task 종료일','Task 진행률'];
+    const headers = ['그룹','카테고리','프로젝트','오너','프로젝트 시작일','프로젝트 종료일','프로젝트 진행률','프로젝트 설명','Task','Task 설명','담당자','Task 시작일','Task 종료일','Task 진행률'];
     const escape = (v: any) => `"${String(v ?? '').replace(/"/g, '""')}"`;
     const rows: string[][] = [];
-    const sorted = [...projects]
+    projects
       .filter(p => activeCategories.length===0 || activeCategories.includes(p.category))
       .sort((a,b) => {
         const oa=CATEGORY_ORDER[a.category]??99, ob=CATEGORY_ORDER[b.category]??99;
         return oa!==ob ? oa-ob : a.id-b.id;
+      })
+      .forEach(proj => {
+        const { progress: projProg } = getProjectMeta(proj);
+        const base = [proj.group||'미분류', proj.category||'', proj.name, proj.owner||'', proj.startDate||'', proj.endDate||'', `${projProg}%`, proj.description||''];
+        if (proj.tasks.length === 0) {
+          rows.push([...base, '', '', '', '', '', '']);
+        } else {
+          proj.tasks.forEach((t: any) => {
+            rows.push([...base, t.name, t.description||'', t.assignee||'', t.startDate||'', t.endDate||'', `${t.progress||0}%`]);
+          });
+        }
       });
-    sorted.forEach(proj => {
-      const { progress: projProg } = getProjectMeta(proj);
-      const base = [proj.category||'', proj.name, proj.owner||'', proj.startDate||'', proj.endDate||'', `${projProg}%`, proj.description||''];
-      if (proj.tasks.length === 0) {
-        rows.push([...base, '', '', '', '', '', '']);
-      } else {
-        proj.tasks.forEach((t: any) => {
-          rows.push([...base, t.name, t.description||'', t.assignee||'', t.startDate||'', t.endDate||'', `${t.progress||0}%`]);
-        });
-      }
-    });
     const csv = [headers, ...rows].map(r => r.map(escape).join(',')).join('\n');
     const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
@@ -210,7 +238,7 @@ export default function GanttChart() {
     a.click(); URL.revokeObjectURL(url);
   };
 
-  const today=new Date();
+  const today = new Date();
   const todayLeft = today>=CHART_START && today<=CHART_END
     ? Math.round((today.getTime()-CHART_START.getTime())/86400000/TOTAL_DAYS*TIMELINE_W) : null;
 
@@ -219,6 +247,7 @@ export default function GanttChart() {
 
   const ProjectEditModal = ({ proj, onClose }: any) => {
     const [fd, setFd] = useState({...proj});
+    const [groupMode, setGroupMode] = useState(allGroups.includes(proj.group) ? 'select' : 'input');
     const colorOpts = [
       {name:'blue',label:'파랑',color:'#3b82f6'},{name:'green',label:'초록',color:'#22c55e'},
       {name:'purple',label:'보라',color:'#a855f7'},{name:'orange',label:'주황',color:'#f97316'},{name:'pink',label:'분홍',color:'#ec4899'},
@@ -235,6 +264,49 @@ export default function GanttChart() {
               <input value={fd.name} onChange={e=>setFd({...fd,name:e.target.value})} style={inp()} /></div>
             <div><label style={{display:'block',fontSize:14,fontWeight:500,marginBottom:4}}>프로젝트 오너</label>
               <input value={fd.owner||''} onChange={e=>setFd({...fd,owner:e.target.value})} style={inp()} /></div>
+              <div>
+              <label style={{display:'block',fontSize:14,fontWeight:500,marginBottom:4}}>
+                그룹 <span style={{fontSize:12,color:'#9ca3af',fontWeight:400}}>(서비스/제품 단위)</span>
+              </label>
+              {groupMode === 'select' ? (
+                <div style={{display:'flex',gap:8}}>
+                  <select
+                    value={fd.group||''}
+                    onChange={e => {
+                      if (e.target.value === '__new__') {
+                        setGroupMode('input');
+                        setFd({...fd, group:''});
+                      } else {
+                        setFd({...fd, group:e.target.value});
+                      }
+                    }}
+                    style={{flex:1,border:'1px solid #d1d5db',borderRadius:8,padding:'8px 12px',fontSize:14,background:'white',cursor:'pointer',outline:'none'}}
+                  >
+                    {allGroups.map(g => <option key={g} value={g}>{g}</option>)}
+                    <option value="__new__">+ 새 그룹 직접 입력</option>
+                  </select>
+                </div>
+              ) : (
+                <div style={{display:'flex',gap:8}}>
+                  <input
+                    autoFocus
+                    value={fd.group||''}
+                    onChange={e => setFd({...fd, group:e.target.value})}
+                    placeholder="새 그룹명 입력"
+                    style={{flex:1,border:'1px solid #d1d5db',borderRadius:8,padding:'8px 12px',fontSize:14,boxSizing:'border-box'}}
+                  />
+                  {allGroups.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => { setGroupMode('select'); setFd({...fd, group: allGroups[0]}); }}
+                      style={{padding:'8px 12px',border:'1px solid #d1d5db',borderRadius:8,background:'white',cursor:'pointer',fontSize:12,color:'#6b7280',whiteSpace:'nowrap'}}
+                    >
+                      목록에서 선택
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
             <div>
               <label style={{display:'block',fontSize:14,fontWeight:500,marginBottom:8}}>카테고리</label>
               <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
@@ -378,10 +450,12 @@ export default function GanttChart() {
             </button>
           </div>
         </div>
+
         {/* 카테고리 필터 */}
         <div style={{display:'flex',gap:8,marginTop:12,alignItems:'center',flexWrap:'wrap'}}>
+          <span style={{fontSize:12,color:'#9ca3af',flexShrink:0}}>카테고리:</span>
           <button onClick={()=>setActiveCategories([])}
-            style={{padding:'6px 18px',borderRadius:20,fontSize:13,cursor:'pointer',fontWeight:activeCategories.length===0?600:400,border:activeCategories.length===0?'2px solid #3b82f6':'2px solid #e5e7eb',background:activeCategories.length===0?'#eff6ff':'white',color:activeCategories.length===0?'#1d4ed8':'#6b7280'}}>
+            style={{padding:'4px 14px',borderRadius:20,fontSize:12,cursor:'pointer',fontWeight:activeCategories.length===0?600:400,border:activeCategories.length===0?'2px solid #3b82f6':'2px solid #e5e7eb',background:activeCategories.length===0?'#eff6ff':'white',color:activeCategories.length===0?'#1d4ed8':'#6b7280'}}>
             전체 <span style={{marginLeft:4,fontSize:11,opacity:0.7}}>{projects.length}</span>
           </button>
           <div style={{width:1,height:20,background:'#e5e7eb'}} />
@@ -390,19 +464,36 @@ export default function GanttChart() {
             const cc=CATEGORY_COLORS[cat];
             return (
               <button key={cat} onClick={()=>setActiveCategories(prev=>prev.includes(cat)?prev.filter(c=>c!==cat):[...prev,cat])}
-                style={{padding:'6px 18px',borderRadius:20,fontSize:13,cursor:'pointer',fontWeight:isActive?600:400,border:isActive?`2px solid ${cc.border}`:'2px solid #e5e7eb',background:isActive?cc.bg:'white',color:isActive?cc.text:'#6b7280'}}>
+                style={{padding:'4px 14px',borderRadius:20,fontSize:12,cursor:'pointer',fontWeight:isActive?600:400,border:isActive?`2px solid ${cc.border}`:'2px solid #e5e7eb',background:isActive?cc.bg:'white',color:isActive?cc.text:'#6b7280'}}>
                 {cat} <span style={{marginLeft:4,fontSize:11,opacity:0.7}}>{projects.filter(p=>p.category===cat).length}</span>
               </button>
             );
           })}
           {activeCategories.length>0 && <button onClick={()=>setActiveCategories([])} style={{marginLeft:4,fontSize:12,color:'#9ca3af',background:'none',border:'none',cursor:'pointer',textDecoration:'underline'}}>초기화</button>}
         </div>
+
+        {/* 그룹 필터 */}
+        {allGroups.length > 0 && (
+          <div style={{display:'flex',gap:8,marginTop:8,alignItems:'center',flexWrap:'wrap'}}>
+            <span style={{fontSize:12,color:'#9ca3af',flexShrink:0}}>그룹:</span>
+            <button onClick={()=>setActiveGroup('')}
+              style={{padding:'4px 14px',borderRadius:20,fontSize:12,cursor:'pointer',fontWeight:activeGroup===''?600:400,border:activeGroup===''?'2px solid #6366f1':'2px solid #e5e7eb',background:activeGroup===''?'#eef2ff':'white',color:activeGroup===''?'#4338ca':'#6b7280'}}>
+              전체
+            </button>
+            {allGroups.map(g=>(
+              <button key={g} onClick={()=>setActiveGroup(prev=>prev===g?'':g)}
+                style={{padding:'4px 14px',borderRadius:20,fontSize:12,cursor:'pointer',fontWeight:activeGroup===g?600:400,border:activeGroup===g?'2px solid #6366f1':'2px solid #e5e7eb',background:activeGroup===g?'#eef2ff':'white',color:activeGroup===g?'#4338ca':'#6b7280'}}>
+                {g} <span style={{fontSize:11,opacity:0.7}}>{projects.filter(p=>(p.group||'미분류')===g).length}</span>
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Chart */}
       <div style={{flex:1,overflow:'auto'}}>
         <div style={{minWidth:totalW}}>
-          {/* Header row */}
+          {/* Column Header */}
           <div style={{display:'flex',position:'sticky',top:0,zIndex:20,background:'white',borderBottom:'1px solid #e5e7eb',boxShadow:'0 1px 3px rgba(0,0,0,0.05)',width:totalW}}>
             <div style={{width:LEFT_COL,minWidth:LEFT_COL,flexShrink:0,padding:'12px 16px',fontWeight:600,fontSize:14,color:'#374151',borderRight:'1px solid #e5e7eb',background:'#f9fafb'}}>프로젝트 / Task</div>
             <div style={{width:ASSIGNEE_COL,minWidth:ASSIGNEE_COL,flexShrink:0,padding:'12px',fontWeight:600,fontSize:14,color:'#374151',borderRight:'1px solid #e5e7eb',background:'#f9fafb',textAlign:'center'}}>담당자</div>
@@ -415,112 +506,152 @@ export default function GanttChart() {
 
           {/* Rows */}
           <div style={{width:totalW}}>
-            {filtered.length===0 ? (
+            {groupedFiltered.length===0 ? (
               <div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'96px 0',color:'#9ca3af',fontSize:14,gap:12}}>
-                <span>{activeCategories.length>0?`${activeCategories.join(', ')} 카테고리에 프로젝트가 없습니다.`:'프로젝트가 없습니다.'}</span>
+                <span>프로젝트가 없습니다.</span>
                 <button onClick={addProject} style={{color:'#3b82f6',background:'none',border:'none',cursor:'pointer',fontSize:13}}>+ 프로젝트 추가하기</button>
               </div>
-            ) : filtered.map(proj=>{
-              const c=COLOR_MAP[proj.color]||COLOR_MAP.blue;
-              const {pos:projPos,progress:projProg}=getProjectMeta(proj);
-              const catColor=CATEGORY_COLORS[proj.category];
-              return (
-                <React.Fragment key={proj.id}>
-                  {/* Project row */}
-                  <div style={{display:'flex',borderBottom:'1px solid #e5e7eb',background:c.rowBg}}>
-                    <div style={{width:LEFT_COL,minWidth:LEFT_COL,flexShrink:0,display:'flex',alignItems:'flex-start',padding:'8px 12px',borderRight:'1px solid #e5e7eb',gap:8}}>
-                      <button onClick={()=>toggleProject(proj.id)} style={{flexShrink:0,padding:2,borderRadius:4,border:'none',background:'none',cursor:'pointer',marginTop:2}}>
-                        <span style={{color:c.text,fontSize:14}}>{proj.expanded?'▼':'▶'}</span>
-                      </button>
-                      <div style={{width:4,borderRadius:2,flexShrink:0,alignSelf:'stretch',background:c.border}} />
-                      <div style={{flex:1,minWidth:0,padding:'4px 0'}}>
-                        <div style={{display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
-                          {catColor && <span style={{fontSize:11,padding:'2px 8px',borderRadius:10,background:catColor.bg,color:catColor.text,border:`1px solid ${catColor.border}`,fontWeight:600,flexShrink:0,whiteSpace:'nowrap'}}>{proj.category}</span>}
-                          <span style={{fontWeight:'bold',fontSize:14,color:c.text,wordBreak:'break-word',lineHeight:1.4}}>{proj.name}</span>
-                        </div>
-                        {proj.description && <div style={{fontSize:12,color:c.text,opacity:0.7,wordBreak:'break-word',marginTop:2}}>{proj.description}</div>}
-                      </div>
-                      <div style={{display:'flex',gap:4,flexShrink:0,marginTop:4}}>
-                        <button onClick={()=>setEditingProject(proj)} style={{padding:4,borderRadius:4,border:'none',background:'none',cursor:'pointer',fontSize:12}}>✏️</button>
-                        <button onClick={()=>addTask(proj.id)} style={{padding:4,borderRadius:4,border:'none',background:'none',cursor:'pointer',fontSize:12}}>➕</button>
-                        <button onClick={()=>deleteProject(proj.id)} style={{padding:4,borderRadius:4,border:'none',background:'none',cursor:'pointer',fontSize:12}}>🗑️</button>
-                      </div>
-                    </div>
-                    <div style={{width:ASSIGNEE_COL,minWidth:ASSIGNEE_COL,flexShrink:0,display:'flex',alignItems:'flex-start',justifyContent:'center',padding:'12px 4px',borderRight:'1px solid #e5e7eb',fontSize:12,color:'#4b5563',textAlign:'center',wordBreak:'break-all'}}>
-                      {proj.owner||<span style={{color:'#d1d5db'}}>-</span>}
-                    </div>
-                    <div style={{width:TIMELINE_W,minWidth:TIMELINE_W,flexShrink:0,position:'relative',minHeight:52,display:'flex',alignItems:'center'}}>
-                      {MONTHS.map((_,i)=><div key={i} style={{width:MONTH_COL,height:'100%',position:'absolute',left:i*MONTH_COL,top:0,borderRight:i<11?'1px solid #f3f4f6':'none'}} />)}
-                      {todayLeft!==null && <div style={{position:'absolute',left:todayLeft,top:0,bottom:0,width:2,background:'#ef4444',opacity:0.7,zIndex:5}} />}
-                      {projPos && proj.tasks.length===0 && (()=>{
-                        const isProjDrag=dragging?.pid===proj.id && dragging?.tid==='__proj__';
-                        return (
-                          <div style={{position:'absolute',left:projPos.left,width:projPos.width,height:22,top:'50%',transform:'translateY(-50%)',background:c.barLight,borderRadius:4,overflow:'visible',border:`1px solid ${c.bar}33`,zIndex:6,cursor:'grab'}}
-                            onMouseDown={e=>handleMouseDown(e,proj.id,'__proj__','move')}
-                            onMouseEnter={e=>{setTooltip({startDate:proj.startDate,endDate:proj.endDate});setTooltipPos({x:e.clientX,y:e.clientY});}}
-                            onMouseMove={e=>setTooltipPos({x:e.clientX,y:e.clientY})}
-                            onMouseLeave={()=>{if(!isProjDrag)setTooltip(null);}}>
-                            <div style={{position:'absolute',left:0,top:0,bottom:0,width:8,cursor:'ew-resize',zIndex:8,borderRadius:'4px 0 0 4px'}} onMouseDown={e=>handleMouseDown(e,proj.id,'__proj__','start')} />
-                            <div style={{width:`${projProg}%`,height:'100%',background:c.bar,borderRadius:4,overflow:'hidden'}} />
-                            <div style={{position:'absolute',inset:0,display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,color:projProg>50?'#fff':c.text,fontWeight:600,pointerEvents:'none'}}>{projProg}%</div>
-                            <div style={{position:'absolute',right:0,top:0,bottom:0,width:8,cursor:'ew-resize',zIndex:8,borderRadius:'0 4px 4px 0'}} onMouseDown={e=>handleMouseDown(e,proj.id,'__proj__','end')} />
-                          </div>
-                        );
-                      })()}
-                      {projPos && proj.tasks.length>0 && (
-                        <div style={{position:'absolute',left:projPos.left,width:projPos.width,height:22,top:'50%',transform:'translateY(-50%)',background:c.barLight,borderRadius:4,overflow:'hidden',border:`1px solid ${c.bar}33`,zIndex:6}}>
-                          <div style={{width:`${projProg}%`,height:'100%',background:c.bar,borderRadius:4}} />
-                          <div style={{position:'absolute',inset:0,display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,color:projProg>50?'#fff':c.text,fontWeight:600}}>{projProg}%</div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
+            ) : groupedFiltered.map(group=>(
+              <React.Fragment key={group.name}>
 
-                  {/* Task rows */}
-                  {proj.expanded && proj.tasks.map((task:any)=>{
-                    const pos=getPos(task.startDate,task.endDate);
-                    const deps=proj.tasks.filter((t:any)=>task.dependencies?.includes(t.id));
-                    const isDrag=dragging?.pid===proj.id && dragging?.tid===task.id;
-                    return (
-                      <div key={task.id} style={{display:'flex',borderBottom:'1px solid #e5e7eb',background:'white'}}>
-                        <div style={{width:LEFT_COL,minWidth:LEFT_COL,flexShrink:0,display:'flex',alignItems:'center',padding:'8px 12px',borderRight:'1px solid #e5e7eb'}}>
-                          <div style={{paddingLeft:24,display:'flex',alignItems:'flex-start',gap:8,width:'100%'}}>
-                            <div style={{flex:1,minWidth:0}}>
-                              <div style={{fontSize:14,color:'#1f2937',wordBreak:'break-word',lineHeight:1.4}}>{task.name}</div>
-                              {task.description && <div style={{fontSize:12,color:'#9ca3af',wordBreak:'break-word',marginTop:2}}>{task.description}</div>}
-                              {deps.length>0 && <div style={{fontSize:12,color:'#7c3aed',background:'#f5f3ff',display:'inline-block',padding:'2px 8px',borderRadius:4,marginTop:2}}>선행: {deps.map((d:any)=>d.name).join(', ')}</div>}
+                {/* 그룹 헤더 */}
+                <div style={{display:'flex',borderBottom:'2px solid #e5e7eb',background:'#f0f4ff',width:totalW}}>
+                  <div style={{width:LEFT_COL,minWidth:LEFT_COL,flexShrink:0,display:'flex',alignItems:'center',padding:'8px 12px',gap:8,borderRight:'1px solid #e5e7eb'}}>
+                    <button onClick={()=>toggleGroup(group.name)} style={{border:'none',background:'none',cursor:'pointer',padding:2,fontSize:13,color:'#6366f1'}}>
+                      {collapsedGroups.has(group.name)?'▶':'▼'}
+                    </button>
+                    <span style={{fontSize:15,color:'#6366f1'}}>📁</span>
+                    {editingGroupName===group.name ? (
+                      <input autoFocus value={editingGroupValue}
+                        onChange={e=>setEditingGroupValue(e.target.value)}
+                        onBlur={()=>{renameGroup(group.name,editingGroupValue);setEditingGroupName(null);}}
+                        onKeyDown={e=>{
+                          if(e.key==='Enter'){renameGroup(group.name,editingGroupValue);setEditingGroupName(null);}
+                          if(e.key==='Escape')setEditingGroupName(null);
+                        }}
+                        style={{fontSize:13,fontWeight:700,border:'1px solid #6366f1',borderRadius:4,padding:'2px 6px',outline:'none',minWidth:120}}
+                      />
+                    ) : (
+                      <span onDoubleClick={()=>{setEditingGroupName(group.name);setEditingGroupValue(group.name);}}
+                        title="더블클릭하여 이름 변경"
+                        style={{fontSize:13,fontWeight:700,color:'#374151',cursor:'text'}}>
+                        {group.name}
+                      </span>
+                    )}
+                    <span style={{fontSize:11,color:'#9ca3af',marginLeft:4}}>({group.items.length}개 프로젝트)</span>
+                  </div>
+                  <div style={{width:ASSIGNEE_COL,minWidth:ASSIGNEE_COL,flexShrink:0,borderRight:'1px solid #e5e7eb'}} />
+                  <div style={{width:TIMELINE_W,minWidth:TIMELINE_W,flexShrink:0,position:'relative',minHeight:38}}>
+                    {MONTHS.map((_,i)=><div key={i} style={{width:MONTH_COL,height:'100%',position:'absolute',left:i*MONTH_COL,top:0,borderRight:i<11?'1px solid #e8ecf8':'none'}} />)}
+                    {todayLeft!==null && <div style={{position:'absolute',left:todayLeft,top:0,bottom:0,width:2,background:'#ef4444',opacity:0.3,zIndex:5}} />}
+                  </div>
+                </div>
+
+                {/* 그룹 내 프로젝트 */}
+                {!collapsedGroups.has(group.name) && group.items.map(proj=>{
+                  const c=COLOR_MAP[proj.color]||COLOR_MAP.blue;
+                  const {pos:projPos,progress:projProg}=getProjectMeta(proj);
+                  const catColor=CATEGORY_COLORS[proj.category];
+                  return (
+                    <React.Fragment key={proj.id}>
+                      {/* Project row */}
+                      <div style={{display:'flex',borderBottom:'1px solid #e5e7eb',background:c.rowBg}}>
+                        <div style={{width:LEFT_COL,minWidth:LEFT_COL,flexShrink:0,display:'flex',alignItems:'flex-start',padding:'8px 12px',borderRight:'1px solid #e5e7eb',gap:8}}>
+                          <div style={{width:16,flexShrink:0}} />
+                          <button onClick={()=>toggleProject(proj.id)} style={{flexShrink:0,padding:2,borderRadius:4,border:'none',background:'none',cursor:'pointer',marginTop:2}}>
+                            <span style={{color:c.text,fontSize:14}}>{proj.expanded?'▼':'▶'}</span>
+                          </button>
+                          <div style={{width:4,borderRadius:2,flexShrink:0,alignSelf:'stretch',background:c.border}} />
+                          <div style={{flex:1,minWidth:0,padding:'4px 0'}}>
+                            <div style={{display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
+                              {catColor && <span style={{fontSize:11,padding:'2px 8px',borderRadius:10,background:catColor.bg,color:catColor.text,border:`1px solid ${catColor.border}`,fontWeight:600,flexShrink:0,whiteSpace:'nowrap'}}>{proj.category}</span>}
+                              <span style={{fontWeight:'bold',fontSize:14,color:c.text,wordBreak:'break-word',lineHeight:1.4}}>{proj.name}</span>
                             </div>
-                            <div style={{display:'flex',gap:4,flexShrink:0,marginTop:2}}>
-                              <button onClick={()=>setEditingTask({task,pid:proj.id})} style={{padding:4,borderRadius:4,border:'none',background:'none',cursor:'pointer',fontSize:12}}>✏️</button>
-                              <button onClick={()=>deleteTask(proj.id,task.id)} style={{padding:4,borderRadius:4,border:'none',background:'none',cursor:'pointer',fontSize:12}}>🗑️</button>
-                            </div>
+                            {proj.description && <div style={{fontSize:12,color:c.text,opacity:0.7,wordBreak:'break-word',marginTop:2}}>{proj.description}</div>}
+                          </div>
+                          <div style={{display:'flex',gap:4,flexShrink:0,marginTop:4}}>
+                            <button onClick={()=>setEditingProject(proj)} style={{padding:4,borderRadius:4,border:'none',background:'none',cursor:'pointer',fontSize:12}}>✏️</button>
+                            <button onClick={()=>addTask(proj.id)} style={{padding:4,borderRadius:4,border:'none',background:'none',cursor:'pointer',fontSize:12}}>➕</button>
+                            <button onClick={()=>deleteProject(proj.id)} style={{padding:4,borderRadius:4,border:'none',background:'none',cursor:'pointer',fontSize:12}}>🗑️</button>
                           </div>
                         </div>
-                        <div style={{width:ASSIGNEE_COL,minWidth:ASSIGNEE_COL,flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',padding:'8px 4px',borderRight:'1px solid #e5e7eb',fontSize:12,color:'#6b7280',textAlign:'center',wordBreak:'break-all'}}>
-                          {task.assignee||<span style={{color:'#d1d5db'}}>-</span>}
+                        <div style={{width:ASSIGNEE_COL,minWidth:ASSIGNEE_COL,flexShrink:0,display:'flex',alignItems:'flex-start',justifyContent:'center',padding:'12px 4px',borderRight:'1px solid #e5e7eb',fontSize:12,color:'#4b5563',textAlign:'center',wordBreak:'break-all'}}>
+                          {proj.owner||<span style={{color:'#d1d5db'}}>-</span>}
                         </div>
-                        <div style={{width:TIMELINE_W,minWidth:TIMELINE_W,flexShrink:0,position:'relative',minHeight:46,display:'flex',alignItems:'center'}}>
+                        <div style={{width:TIMELINE_W,minWidth:TIMELINE_W,flexShrink:0,position:'relative',minHeight:52,display:'flex',alignItems:'center'}}>
                           {MONTHS.map((_,i)=><div key={i} style={{width:MONTH_COL,height:'100%',position:'absolute',left:i*MONTH_COL,top:0,borderRight:i<11?'1px solid #f3f4f6':'none'}} />)}
-                          {todayLeft!==null && <div style={{position:'absolute',left:todayLeft,top:0,bottom:0,width:2,background:'#ef4444',opacity:0.4,zIndex:5}} />}
-                          {pos && (
-                            <div style={{position:'absolute',left:pos.left,width:pos.width,height:26,top:'50%',transform:'translateY(-50%)',background:c.barLight,borderRadius:5,border:`1px solid ${c.bar}44`,cursor:'grab',zIndex:6,overflow:'visible'}}
-                              onMouseDown={e=>handleMouseDown(e,proj.id,task.id,'move')}
-                              onMouseEnter={e=>{setTooltip({startDate:task.startDate,endDate:task.endDate});setTooltipPos({x:e.clientX,y:e.clientY});}}
-                              onMouseMove={e=>setTooltipPos({x:e.clientX,y:e.clientY})}
-                              onMouseLeave={()=>{if(!isDrag)setTooltip(null);}}>
-                              <div style={{position:'absolute',left:0,top:0,bottom:0,width:8,cursor:'ew-resize',zIndex:8,borderRadius:'5px 0 0 5px'}} onMouseDown={e=>handleMouseDown(e,proj.id,task.id,'start')} />
-                              <div style={{width:`${task.progress||0}%`,height:'100%',background:c.bar,borderRadius:4,pointerEvents:'none'}} />
-                              <div style={{position:'absolute',inset:0,display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,fontWeight:600,pointerEvents:'none',color:(task.progress||0)>50?'#fff':c.text}}>{task.progress||0}%</div>
-                              <div style={{position:'absolute',right:0,top:0,bottom:0,width:8,cursor:'ew-resize',zIndex:8,borderRadius:'0 5px 5px 0'}} onMouseDown={e=>handleMouseDown(e,proj.id,task.id,'end')} />
+                          {todayLeft!==null && <div style={{position:'absolute',left:todayLeft,top:0,bottom:0,width:2,background:'#ef4444',opacity:0.7,zIndex:5}} />}
+                          {projPos && proj.tasks.length===0 && (()=>{
+                            const isProjDrag=dragging?.pid===proj.id && dragging?.tid==='__proj__';
+                            return (
+                              <div style={{position:'absolute',left:projPos.left,width:projPos.width,height:22,top:'50%',transform:'translateY(-50%)',background:c.barLight,borderRadius:4,overflow:'visible',border:`1px solid ${c.bar}33`,zIndex:6,cursor:'grab'}}
+                                onMouseDown={e=>handleMouseDown(e,proj.id,'__proj__','move')}
+                                onMouseEnter={e=>{setTooltip({startDate:proj.startDate,endDate:proj.endDate});setTooltipPos({x:e.clientX,y:e.clientY});}}
+                                onMouseMove={e=>setTooltipPos({x:e.clientX,y:e.clientY})}
+                                onMouseLeave={()=>{if(!isProjDrag)setTooltip(null);}}>
+                                <div style={{position:'absolute',left:0,top:0,bottom:0,width:8,cursor:'ew-resize',zIndex:8,borderRadius:'4px 0 0 4px'}} onMouseDown={e=>handleMouseDown(e,proj.id,'__proj__','start')} />
+                                <div style={{width:`${projProg}%`,height:'100%',background:c.bar,borderRadius:4,overflow:'hidden'}} />
+                                <div style={{position:'absolute',inset:0,display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,color:projProg>50?'#fff':c.text,fontWeight:600,pointerEvents:'none'}}>{projProg}%</div>
+                                <div style={{position:'absolute',right:0,top:0,bottom:0,width:8,cursor:'ew-resize',zIndex:8,borderRadius:'0 4px 4px 0'}} onMouseDown={e=>handleMouseDown(e,proj.id,'__proj__','end')} />
+                              </div>
+                            );
+                          })()}
+                          {projPos && proj.tasks.length>0 && (
+                            <div style={{position:'absolute',left:projPos.left,width:projPos.width,height:22,top:'50%',transform:'translateY(-50%)',background:c.barLight,borderRadius:4,overflow:'hidden',border:`1px solid ${c.bar}33`,zIndex:6}}>
+                              <div style={{width:`${projProg}%`,height:'100%',background:c.bar,borderRadius:4}} />
+                              <div style={{position:'absolute',inset:0,display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,color:projProg>50?'#fff':c.text,fontWeight:600}}>{projProg}%</div>
                             </div>
                           )}
                         </div>
                       </div>
-                    );
-                  })}
-                </React.Fragment>
-              );
-            })}
+
+                      {/* Task rows */}
+                      {proj.expanded && proj.tasks.map((task:any)=>{
+                        const pos=getPos(task.startDate,task.endDate);
+                        const deps=proj.tasks.filter((t:any)=>task.dependencies?.includes(t.id));
+                        const isDrag=dragging?.pid===proj.id && dragging?.tid===task.id;
+                        return (
+                          <div key={task.id} style={{display:'flex',borderBottom:'1px solid #e5e7eb',background:'white'}}>
+                            <div style={{width:LEFT_COL,minWidth:LEFT_COL,flexShrink:0,display:'flex',alignItems:'center',padding:'8px 12px',borderRight:'1px solid #e5e7eb'}}>
+                              <div style={{paddingLeft:40,display:'flex',alignItems:'flex-start',gap:8,width:'100%'}}>
+                                <div style={{flex:1,minWidth:0}}>
+                                  <div style={{fontSize:14,color:'#1f2937',wordBreak:'break-word',lineHeight:1.4}}>{task.name}</div>
+                                  {task.description && <div style={{fontSize:12,color:'#9ca3af',wordBreak:'break-word',marginTop:2}}>{task.description}</div>}
+                                  {deps.length>0 && <div style={{fontSize:12,color:'#7c3aed',background:'#f5f3ff',display:'inline-block',padding:'2px 8px',borderRadius:4,marginTop:2}}>선행: {deps.map((d:any)=>d.name).join(', ')}</div>}
+                                </div>
+                                <div style={{display:'flex',gap:4,flexShrink:0,marginTop:2}}>
+                                  <button onClick={()=>setEditingTask({task,pid:proj.id})} style={{padding:4,borderRadius:4,border:'none',background:'none',cursor:'pointer',fontSize:12}}>✏️</button>
+                                  <button onClick={()=>deleteTask(proj.id,task.id)} style={{padding:4,borderRadius:4,border:'none',background:'none',cursor:'pointer',fontSize:12}}>🗑️</button>
+                                </div>
+                              </div>
+                            </div>
+                            <div style={{width:ASSIGNEE_COL,minWidth:ASSIGNEE_COL,flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',padding:'8px 4px',borderRight:'1px solid #e5e7eb',fontSize:12,color:'#6b7280',textAlign:'center',wordBreak:'break-all'}}>
+                              {task.assignee||<span style={{color:'#d1d5db'}}>-</span>}
+                            </div>
+                            <div style={{width:TIMELINE_W,minWidth:TIMELINE_W,flexShrink:0,position:'relative',minHeight:46,display:'flex',alignItems:'center'}}>
+                              {MONTHS.map((_,i)=><div key={i} style={{width:MONTH_COL,height:'100%',position:'absolute',left:i*MONTH_COL,top:0,borderRight:i<11?'1px solid #f3f4f6':'none'}} />)}
+                              {todayLeft!==null && <div style={{position:'absolute',left:todayLeft,top:0,bottom:0,width:2,background:'#ef4444',opacity:0.4,zIndex:5}} />}
+                              {pos && (
+                                <div style={{position:'absolute',left:pos.left,width:pos.width,height:26,top:'50%',transform:'translateY(-50%)',background:c.barLight,borderRadius:5,border:`1px solid ${c.bar}44`,cursor:'grab',zIndex:6,overflow:'visible'}}
+                                  onMouseDown={e=>handleMouseDown(e,proj.id,task.id,'move')}
+                                  onMouseEnter={e=>{setTooltip({startDate:task.startDate,endDate:task.endDate});setTooltipPos({x:e.clientX,y:e.clientY});}}
+                                  onMouseMove={e=>setTooltipPos({x:e.clientX,y:e.clientY})}
+                                  onMouseLeave={()=>{if(!isDrag)setTooltip(null);}}>
+                                  <div style={{position:'absolute',left:0,top:0,bottom:0,width:8,cursor:'ew-resize',zIndex:8,borderRadius:'5px 0 0 5px'}} onMouseDown={e=>handleMouseDown(e,proj.id,task.id,'start')} />
+                                  <div style={{width:`${task.progress||0}%`,height:'100%',background:c.bar,borderRadius:4,pointerEvents:'none'}} />
+                                  <div style={{position:'absolute',inset:0,display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,fontWeight:600,pointerEvents:'none',color:(task.progress||0)>50?'#fff':c.text}}>{task.progress||0}%</div>
+                                  <div style={{position:'absolute',right:0,top:0,bottom:0,width:8,cursor:'ew-resize',zIndex:8,borderRadius:'0 5px 5px 0'}} onMouseDown={e=>handleMouseDown(e,proj.id,task.id,'end')} />
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </React.Fragment>
+                  );
+                })}
+              </React.Fragment>
+            ))}
           </div>
         </div>
       </div>
@@ -529,7 +660,7 @@ export default function GanttChart() {
       <div style={{background:'white',borderTop:'1px solid #e5e7eb',padding:'8px 24px',display:'flex',alignItems:'center',gap:24,fontSize:12,color:'#6b7280',flexShrink:0,flexWrap:'wrap'}}>
         <div style={{display:'flex',alignItems:'center',gap:6}}><div style={{width:12,height:12,borderRadius:'50%',background:'#f87171'}} /><span>오늘</span></div>
         <div style={{display:'flex',alignItems:'center',gap:6}}><div style={{width:32,height:12,borderRadius:4,background:'linear-gradient(to right, #3b82f6 50%, #bfdbfe 50%)'}} /><span>진행률</span></div>
-        <span style={{marginLeft:'auto',color:'#9ca3af'}}>바를 드래그하여 일정 조정 | 양쪽 끝을 드래그하여 기간 조정</span>
+        <span style={{marginLeft:'auto',color:'#9ca3af'}}>바를 드래그하여 일정 조정 | 그룹명 더블클릭으로 이름 변경</span>
       </div>
 
       {/* 툴팁 */}
