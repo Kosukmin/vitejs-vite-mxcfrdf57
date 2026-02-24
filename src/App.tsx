@@ -684,8 +684,7 @@ export default function GanttChart() {
                       const totalH = totalLanes * BAR_H + (totalLanes - 1) * GAP;
 
                       return assigned.map(({proj,c,pos,progress,lane})=>{
-                        const topOffset = lane * (BAR_H + GAP);
-                        const containerH = Math.max(38, totalH + 8);
+                        const topOffset = lane * (BAR_H + GAP);                        
                         return (
                           <div key={proj.id}
                             style={{position:'absolute',left:pos.left,width:pos.width,height:BAR_H,top:`calc(50% - ${totalH/2}px + ${topOffset}px)`,background:c.barLight,borderRadius:3,border:`1px solid ${c.bar}66`,zIndex:6,cursor:'default',overflow:'hidden'}}
