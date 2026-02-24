@@ -249,8 +249,8 @@ export default function GanttChart() {
 
   const allGroups = Array.from(new Set(projects.map(p => p.group || '미분류')))
   .sort((a, b) => {
-    if (a === '미분류') return 1;
-    if (b === '미분류') return -1;
+    if (a === '미분류') return -1;
+    if (b === '미분류') return 1;
     return a.localeCompare(b, 'ko');
   });
 
