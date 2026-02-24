@@ -580,11 +580,21 @@ export default function GanttChart() {
         </div>
 
         {/* 범례 */}
-        <div style={{display:'flex',alignItems:'center',gap:20,marginTop:8,fontSize:12,color:'#e2e8f0',flexWrap:'wrap'}}>
-          <div style={{display:'flex',alignItems:'center',gap:6}}><div style={{width:3,height:14,borderRadius:2,background:'#f87171'}} /><span>오늘</span></div>
-          <div style={{display:'flex',alignItems:'center',gap:6}}><div style={{width:32,height:12,borderRadius:4,background:'linear-gradient(to right, #3b82f6 50%, #bfdbfe 50%)'}} /><span>진행률</span></div>
-          <span style={{marginLeft:'auto',color:'rgba(226,232,240,0.7)',fontSize:12}}>바를 드래그하여 일정 조정 | 그룹명 더블클릭으로 이름 변경</span>
-        </div>
+        <div style={{display:'flex',alignItems:'center',gap:16,marginTop:8,fontSize:12,color:'#e2e8f0',flexWrap:'wrap'}}>
+  <div style={{display:'flex',alignItems:'center',gap:6}}><div style={{width:3,height:14,borderRadius:2,background:'#f87171'}} /><span>오늘</span></div>
+  <div style={{display:'flex',alignItems:'center',gap:6}}><div style={{width:32,height:12,borderRadius:4,background:'linear-gradient(to right, #3b82f6 50%, #bfdbfe 50%)'}} /><span>진행률</span></div>
+  <div style={{width:1,height:14,background:'rgba(255,255,255,0.2)'}} />
+  {CATEGORIES.map(cat=>{
+    const cc = CATEGORY_COLORS[cat];
+    return (
+      <div key={cat} style={{display:'flex',alignItems:'center',gap:5}}>
+        <div style={{width:12,height:12,borderRadius:3,background:cc.bar,flexShrink:0}} />
+        <span style={{color:'rgba(226,232,240,0.85)'}}>{cat}</span>
+      </div>
+    );
+  })}
+  <span style={{marginLeft:'auto',color:'rgba(226,232,240,0.7)',fontSize:12}}>바를 드래그하여 일정 조정 | 그룹명 더블클릭으로 이름 변경</span>
+</div>
       </div>
 
       {/* Chart */}
