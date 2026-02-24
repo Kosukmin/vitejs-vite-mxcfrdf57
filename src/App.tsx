@@ -1,6 +1,6 @@
 // src/App.tsx 전체 내용을 이걸로 교체하세요!
-const { createClient } = (window as any).supabase;
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+const { createClient } = (window as any).supabase;
 
 const SUPABASE_URL = 'https://tcmcrpszpbawgwolzuno.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_ktL_xVzsDjv3wmbrO8j0Tg_DP2vYBHO';
@@ -102,7 +102,7 @@ export default function GanttChart() {
   // ── 히스토리 스냅샷 (직접 호출용) ───────────────────
   const saveHistorySnapshot = async (p: any[], memo?: string) => {
     try {
-      await supabase.from('gantt_history').insert({ data: p, memo: memo || '' });
+      await supabase.from('gantt_history').insert({ data: p, memo: memo || '', app_id: 1 });
     } catch {}
   };
 
@@ -130,6 +130,7 @@ export default function GanttChart() {
       const { data } = await supabase
         .from('gantt_history')
         .select('id, saved_at, memo')
+        .eq('app_id', 1)
         .order('saved_at', { ascending: false })
         .limit(50);
       setHistory(data || []);
