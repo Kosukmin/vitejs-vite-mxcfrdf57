@@ -247,7 +247,12 @@ export default function GanttChart() {
     return () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
   }, [dragging, TIMELINE_W]);
 
-  const allGroups = Array.from(new Set(projects.map(p => p.group || '미분류')));
+  const allGroups = Array.from(new Set(projects.map(p => p.group || '미분류')))
+  .sort((a, b) => {
+    if (a === '미분류') return 1;
+    if (b === '미분류') return -1;
+    return a.localeCompare(b, 'ko');
+  });
 
   const filtered = projects
     .filter(p => activeCategories.length===0 || activeCategories.includes(p.category))
