@@ -60,7 +60,17 @@ export default function GanttChart() {
   const [dragging, setDragging]               = useState<any>(null);
   const [tooltip, setTooltip]                 = useState<any>(null);
   const [tooltipPos, setTooltipPos]           = useState({ x:0, y:0 });
-  const dragRef = useRef<any>(null);
+
+  // ── 히스토리 상태 ──────────────────────────────────
+  const [showHistory, setShowHistory]         = useState(false);
+  const [history, setHistory]                 = useState<any[]>([]);
+  const [historyLoading, setHistoryLoading]   = useState(false);
+  const [restoring, setRestoring]             = useState(false);
+  // ────────────────────────────────────────────────────
+
+  const dragRef        = useRef<any>(null);
+  const historyTimer   = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const HISTORY_DEBOUNCE_MS = 5 * 60 * 1000; // 5분
 
   useEffect(() => {
     const onResize = () => setCols(calcCols(window.innerWidth));
@@ -88,12 +98,66 @@ export default function GanttChart() {
     finally { setLoading(false); }
   };
 
-  const save = async (p: any[]) => {
+  // ── 히스토리 스냅샷 (직접 호출용) ───────────────────
+  const saveHistorySnapshot = async (p: any[], memo?: string) => {
+    try {
+      await supabase.from('gantt_history').insert({ data: p, memo: memo || '' });
+    } catch {}
+  };
+
+  // ── 저장 (간트 데이터) + 5분 디바운스 히스토리 ─────
+  const save = async (p: any[], memo?: string) => {
     setProjects(p);
     setSaving(true);
-    try { await supabase.from('gantt_projects').upsert({ id:1, data:p }); } catch {}
+    try {
+      await supabase.from('gantt_projects').upsert({ id: 1, data: p });
+    } catch {}
     finally { setSaving(false); }
+
+    // 히스토리: 마지막 변경 후 5분 뒤에 한 번만 스냅샷
+    if (historyTimer.current) clearTimeout(historyTimer.current);
+    historyTimer.current = setTimeout(() => {
+      saveHistorySnapshot(p, memo);
+    }, HISTORY_DEBOUNCE_MS);
   };
+
+  // ── 히스토리 목록 불러오기 ────────────────────────
+  const loadHistory = async () => {
+    setHistoryLoading(true);
+    setShowHistory(true);
+    try {
+      const { data } = await supabase
+        .from('gantt_history')
+        .select('id, saved_at, memo')
+        .order('saved_at', { ascending: false })
+        .limit(50);
+      setHistory(data || []);
+    } catch {}
+    finally { setHistoryLoading(false); }
+  };
+
+  // ── 특정 시점으로 복원 ────────────────────────────
+  const restoreHistory = async (id: number) => {
+    if (!confirm('이 시점으로 복원할까요?\n현재 데이터는 덮어쓰여집니다.')) return;
+    setRestoring(true);
+    try {
+      const { data } = await supabase.from('gantt_history').select('data').eq('id', id).single();
+      if (data) {
+        // 복원은 간트 저장 + 즉시 스냅샷
+        setProjects(data.data);
+        setSaving(true);
+        try { await supabase.from('gantt_projects').upsert({ id: 1, data: data.data }); } catch {}
+        finally { setSaving(false); }
+        await saveHistorySnapshot(data.data, '복원됨');
+        setShowHistory(false);
+        alert('복원 완료!');
+      }
+    } catch {
+      alert('복원 중 오류가 발생했습니다.');
+    }
+    finally { setRestoring(false); }
+  };
+  // ────────────────────────────────────────────────────
 
   const addProject = () => save([...projects, {
     id:Date.now(), name:'새 프로젝트', owner:'', description:'',
@@ -183,13 +247,7 @@ export default function GanttChart() {
     return () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
   }, [dragging, TIMELINE_W]);
 
-  const allGroups = Array.from(new Set(projects.map(p => p.group || '미분류')))
-  .sort((a, b) => {
-    if (a === '미분류') return -1;
-    if (b === '미분류') return 1;
-    return a.localeCompare(b, 'ko');
-  });
-
+  const allGroups = Array.from(new Set(projects.map(p => p.group || '미분류')));
 
   const filtered = projects
     .filter(p => activeCategories.length===0 || activeCategories.includes(p.category))
@@ -247,7 +305,6 @@ export default function GanttChart() {
 
   const ProjectEditModal = ({ proj, onClose }: any) => {
     const [fd, setFd] = useState({...proj});
-    const [groupMode, setGroupMode] = useState(allGroups.includes(proj.group) ? 'select' : 'input');
     const colorOpts = [
       {name:'blue',label:'파랑',color:'#3b82f6'},{name:'green',label:'초록',color:'#22c55e'},
       {name:'purple',label:'보라',color:'#a855f7'},{name:'orange',label:'주황',color:'#f97316'},{name:'pink',label:'분홍',color:'#ec4899'},
@@ -264,48 +321,13 @@ export default function GanttChart() {
               <input value={fd.name} onChange={e=>setFd({...fd,name:e.target.value})} style={inp()} /></div>
             <div><label style={{display:'block',fontSize:14,fontWeight:500,marginBottom:4}}>프로젝트 오너</label>
               <input value={fd.owner||''} onChange={e=>setFd({...fd,owner:e.target.value})} style={inp()} /></div>
-              <div>
-              <label style={{display:'block',fontSize:14,fontWeight:500,marginBottom:4}}>
-                그룹 <span style={{fontSize:12,color:'#9ca3af',fontWeight:400}}>(서비스/제품 단위)</span>
-              </label>
-              {groupMode === 'select' ? (
-                <div style={{display:'flex',gap:8}}>
-                  <select
-                    value={fd.group||''}
-                    onChange={e => {
-                      if (e.target.value === '__new__') {
-                        setGroupMode('input');
-                        setFd({...fd, group:''});
-                      } else {
-                        setFd({...fd, group:e.target.value});
-                      }
-                    }}
-                    style={{flex:1,border:'1px solid #d1d5db',borderRadius:8,padding:'8px 12px',fontSize:14,background:'white',cursor:'pointer',outline:'none'}}
-                  >
-                    {allGroups.map(g => <option key={g} value={g}>{g}</option>)}
-                    <option value="__new__">+ 새 그룹 직접 입력</option>
-                  </select>
-                </div>
-              ) : (
-                <div style={{display:'flex',gap:8}}>
-                  <input
-                    autoFocus
-                    value={fd.group||''}
-                    onChange={e => setFd({...fd, group:e.target.value})}
-                    placeholder="새 그룹명 입력"
-                    style={{flex:1,border:'1px solid #d1d5db',borderRadius:8,padding:'8px 12px',fontSize:14,boxSizing:'border-box'}}
-                  />
-                  {allGroups.length > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => { setGroupMode('select'); setFd({...fd, group: allGroups[0]}); }}
-                      style={{padding:'8px 12px',border:'1px solid #d1d5db',borderRadius:8,background:'white',cursor:'pointer',fontSize:12,color:'#6b7280',whiteSpace:'nowrap'}}
-                    >
-                      목록에서 선택
-                    </button>
-                  )}
-                </div>
-              )}
+            <div>
+              <label style={{display:'block',fontSize:14,fontWeight:500,marginBottom:4}}>그룹 <span style={{fontSize:12,color:'#9ca3af',fontWeight:400}}>(서비스/제품 단위)</span></label>
+              <input value={fd.group||''} onChange={e=>setFd({...fd,group:e.target.value})}
+                placeholder="예: 대시보드, 방문자예약시스템" style={inp()} list="group-suggestions" />
+              <datalist id="group-suggestions">
+                {allGroups.map(g=><option key={g} value={g} />)}
+              </datalist>
             </div>
             <div>
               <label style={{display:'block',fontSize:14,fontWeight:500,marginBottom:8}}>카테고리</label>
@@ -405,6 +427,63 @@ export default function GanttChart() {
     );
   };
 
+  // ── 히스토리 모달 ─────────────────────────────────
+  const HistoryModal = () => (
+    <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:50,padding:16}}
+      onClick={()=>setShowHistory(false)}>
+      <div style={{background:'white',borderRadius:12,padding:24,width:Math.min(480, window.innerWidth*0.95),maxHeight:'75vh',display:'flex',flexDirection:'column',boxShadow:'0 20px 60px rgba(0,0,0,0.3)'}}
+        onClick={e=>e.stopPropagation()}>
+        {/* 모달 헤더 */}
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16,flexShrink:0}}>
+          <div>
+            <h3 style={{margin:0,fontSize:18,fontWeight:'bold'}}>🕐 저장 히스토리</h3>
+            <p style={{margin:'4px 0 0',fontSize:12,color:'#9ca3af'}}>최근 50개 스냅샷 · 복원 버튼으로 해당 시점으로 되돌리기</p>
+          </div>
+          <button onClick={()=>setShowHistory(false)} style={{border:'none',background:'none',cursor:'pointer',fontSize:20,color:'#9ca3af',flexShrink:0}}>✕</button>
+        </div>
+
+        {/* 목록 */}
+        <div style={{overflowY:'auto',flex:1}}>
+          {historyLoading ? (
+            <div style={{display:'flex',alignItems:'center',justifyContent:'center',padding:'48px 0',gap:10,color:'#6b7280'}}>
+              <div style={{width:20,height:20,border:'3px solid #a78bfa',borderTopColor:'transparent',borderRadius:'50%',animation:'spin 0.8s linear infinite'}} />
+              <span style={{fontSize:14}}>불러오는 중...</span>
+            </div>
+          ) : history.length === 0 ? (
+            <div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'48px 0',color:'#9ca3af',gap:8}}>
+              <span style={{fontSize:32}}>📭</span>
+              <span style={{fontSize:14}}>저장 히스토리가 없습니다.</span>
+            </div>
+          ) : history.map((h, i) => (
+            <div key={h.id} style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'12px 14px',borderRadius:10,marginBottom:6,background:i===0?'#f5f3ff':'#f9fafb',border:`1px solid ${i===0?'#c4b5fd':'#e5e7eb'}`,transition:'background 0.15s'}}>
+              <div style={{minWidth:0,flex:1}}>
+                <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
+                  <span style={{fontSize:13,fontWeight:600,color:'#1f2937'}}>
+                    {new Date(h.saved_at).toLocaleString('ko-KR',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit'})}
+                  </span>
+                  {i===0 && <span style={{fontSize:11,color:'#7c3aed',background:'#ede9fe',padding:'1px 8px',borderRadius:10,fontWeight:600}}>최신</span>}
+                </div>
+                {h.memo && (
+                  <div style={{fontSize:12,color:'#6b7280',marginTop:3,display:'flex',alignItems:'center',gap:4}}>
+                    <span style={{opacity:0.6}}>📝</span>
+                    <span>{h.memo}</span>
+                  </div>
+                )}
+              </div>
+              <button
+                onClick={()=>restoreHistory(h.id)}
+                disabled={restoring}
+                style={{padding:'6px 14px',background:restoring?'#e5e7eb':'#7c3aed',color:restoring?'#9ca3af':'white',border:'none',borderRadius:7,cursor:restoring?'not-allowed':'pointer',fontSize:12,fontWeight:600,flexShrink:0,marginLeft:12,whiteSpace:'nowrap'}}>
+                {restoring ? '복원 중...' : '복원'}
+              </button>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+  // ────────────────────────────────────────────────────
+
   if (loading) return (
     <div style={{display:'flex',alignItems:'center',justifyContent:'center',height:'100vh',flexDirection:'column',gap:12,color:'#6b7280'}}>
       <div style={{width:32,height:32,border:'4px solid #93c5fd',borderTopColor:'transparent',borderRadius:'50%',animation:'spin 0.8s linear infinite'}} />
@@ -416,74 +495,83 @@ export default function GanttChart() {
   const totalW = LEFT_COL + ASSIGNEE_COL + TIMELINE_W;
 
   return (
-    <div style={{minHeight:'100vh',width:'100%',background:'#f3f4f6',display:'flex',flexDirection:'column',fontFamily:"'Pretendard',-apple-system,BlinkMacSystemFont,sans-serif"}}>
+    <div style={{minHeight:'100vh',width:'100%',background:'#eef0f5',display:'flex',flexDirection:'column',fontFamily:"'Pretendard',-apple-system,BlinkMacSystemFont,sans-serif"}}>
       <style>{`
         @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
         @keyframes spin{to{transform:rotate(360deg)}}
         *{box-sizing:border-box; font-family:'Pretendard',-apple-system,BlinkMacSystemFont,sans-serif;}
       `}</style>
 
-      {/* Header */}
-      <div style={{background:'white',borderBottom:'1px solid #e5e7eb',padding:'16px 24px',flexShrink:0,boxShadow:'0 1px 3px rgba(0,0,0,0.05)'}}>
+      {/* Header - 다크 테마 */}
+      <div style={{background:'linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 60%, #16213e 100%)',borderBottom:'1px solid rgba(255,255,255,0.08)',padding:'16px 24px',flexShrink:0,boxShadow:'0 2px 16px rgba(0,0,0,0.4)'}}>
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:8}}>
-          <div>
-            <h1 style={{fontSize:20,fontWeight:'bold',color:'#111827',margin:0}}>샌디버스 간트차트</h1>
-            <p style={{fontSize:12,color:'#9ca3af',margin:'2px 0 0'}}>2026년 · Supabase 연동</p>
+          <div style={{display:'flex',alignItems:'center',gap:12}}>
+            <div style={{width:36,height:36,borderRadius:10,background:'linear-gradient(135deg,#6366f1,#a855f7)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:18,boxShadow:'0 2px 8px rgba(99,102,241,0.4)'}}>📊</div>
+            <div>
+              <h1 style={{fontSize:18,fontWeight:'bold',color:'#f1f5f9',margin:0,letterSpacing:'-0.3px'}}>샌디버스 간트차트</h1>
+              <p style={{fontSize:11,color:'rgba(148,163,184,0.8)',margin:'2px 0 0'}}>2026년 · Supabase 연동</p>
+            </div>
           </div>
           <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
             {saving && (
-              <div style={{display:'flex',alignItems:'center',gap:6,fontSize:12,color:'#16a34a',background:'#f0fdf4',padding:'6px 12px',borderRadius:20}}>
-                <div style={{width:12,height:12,border:'2px solid #16a34a',borderTopColor:'transparent',borderRadius:'50%',animation:'spin 0.8s linear infinite'}} />저장 중...
+              <div style={{display:'flex',alignItems:'center',gap:6,fontSize:12,color:'#4ade80',background:'rgba(74,222,128,0.1)',padding:'6px 12px',borderRadius:20,border:'1px solid rgba(74,222,128,0.2)'}}>
+                <div style={{width:12,height:12,border:'2px solid #4ade80',borderTopColor:'transparent',borderRadius:'50%',animation:'spin 0.8s linear infinite'}} />저장 중...
               </div>
             )}
             <div style={{position:'relative'}}>
-              <span style={{position:'absolute',left:10,top:'50%',transform:'translateY(-50%)',color:'#9ca3af',fontSize:14}}>🔍</span>
+              <span style={{position:'absolute',left:10,top:'50%',transform:'translateY(-50%)',color:'rgba(148,163,184,0.6)',fontSize:14}}>🔍</span>
               <input type="text" placeholder="검색..." value={searchQuery} onChange={e=>setSearchQuery(e.target.value)}
-                style={{paddingLeft:32,paddingRight:12,paddingTop:8,paddingBottom:8,border:'1px solid #d1d5db',borderRadius:8,width:200,fontSize:14,outline:'none'}} />
+                style={{paddingLeft:32,paddingRight:12,paddingTop:8,paddingBottom:8,border:'1px solid rgba(255,255,255,0.12)',borderRadius:8,width:180,fontSize:13,outline:'none',background:'rgba(255,255,255,0.07)',color:'#f1f5f9'}} />
             </div>
-            <button onClick={load} style={{padding:'8px 12px',border:'1px solid #d1d5db',borderRadius:8,background:'white',cursor:'pointer',fontSize:14}} title="새로고침">🔄</button>
-            <button onClick={exportCSV} style={{display:'flex',alignItems:'center',gap:6,padding:'8px 14px',background:'#16a34a',color:'white',border:'none',borderRadius:8,cursor:'pointer',fontSize:14,fontWeight:500}}>
+            <button onClick={load}
+              style={{padding:'8px 12px',border:'1px solid rgba(255,255,255,0.12)',borderRadius:8,background:'rgba(255,255,255,0.07)',cursor:'pointer',fontSize:14,color:'#e2e8f0'}} title="새로고침">🔄</button>
+            <button onClick={loadHistory}
+              style={{display:'flex',alignItems:'center',gap:6,padding:'8px 14px',background:'rgba(124,58,237,0.85)',color:'white',border:'1px solid rgba(167,139,250,0.3)',borderRadius:8,cursor:'pointer',fontSize:13,fontWeight:500,boxShadow:'0 1px 6px rgba(124,58,237,0.3)'}}>
+              🕐 히스토리
+            </button>
+            <button onClick={exportCSV}
+              style={{display:'flex',alignItems:'center',gap:6,padding:'8px 14px',background:'rgba(22,163,74,0.85)',color:'white',border:'1px solid rgba(74,222,128,0.2)',borderRadius:8,cursor:'pointer',fontSize:13,fontWeight:500,boxShadow:'0 1px 6px rgba(22,163,74,0.25)'}}>
               ⬇ CSV
             </button>
-            <button onClick={addProject} style={{display:'flex',alignItems:'center',gap:6,padding:'8px 16px',background:'#3b82f6',color:'white',border:'none',borderRadius:8,cursor:'pointer',fontSize:14,fontWeight:500}}>
+            <button onClick={addProject}
+              style={{display:'flex',alignItems:'center',gap:6,padding:'8px 16px',background:'linear-gradient(135deg,#6366f1,#8b5cf6)',color:'white',border:'none',borderRadius:8,cursor:'pointer',fontSize:13,fontWeight:600,boxShadow:'0 2px 8px rgba(99,102,241,0.4)'}}>
               + 프로젝트 추가
             </button>
           </div>
         </div>
 
         {/* 카테고리 필터 */}
-        <div style={{display:'flex',gap:8,marginTop:12,alignItems:'center',flexWrap:'wrap'}}>
-          <span style={{fontSize:12,color:'#9ca3af',flexShrink:0}}>카테고리:</span>
+        <div style={{display:'flex',gap:6,marginTop:14,alignItems:'center',flexWrap:'wrap'}}>
           <button onClick={()=>setActiveCategories([])}
-            style={{padding:'4px 14px',borderRadius:20,fontSize:12,cursor:'pointer',fontWeight:activeCategories.length===0?600:400,border:activeCategories.length===0?'2px solid #3b82f6':'2px solid #e5e7eb',background:activeCategories.length===0?'#eff6ff':'white',color:activeCategories.length===0?'#1d4ed8':'#6b7280'}}>
-            전체 <span style={{marginLeft:4,fontSize:11,opacity:0.7}}>{projects.length}</span>
+            style={{padding:'5px 16px',borderRadius:20,fontSize:12,cursor:'pointer',fontWeight:activeCategories.length===0?600:400,border:activeCategories.length===0?'1.5px solid #818cf8':'1.5px solid rgba(255,255,255,0.15)',background:activeCategories.length===0?'rgba(99,102,241,0.25)':'rgba(255,255,255,0.05)',color:activeCategories.length===0?'#a5b4fc':'rgba(148,163,184,0.8)'}}>
+            전체 <span style={{marginLeft:3,fontSize:11,opacity:0.7}}>{projects.length}</span>
           </button>
-          <div style={{width:1,height:20,background:'#e5e7eb'}} />
+          <div style={{width:1,height:16,background:'rgba(255,255,255,0.12)'}} />
           {CATEGORIES.map(cat=>{
             const isActive=activeCategories.includes(cat);
             const cc=CATEGORY_COLORS[cat];
             return (
               <button key={cat} onClick={()=>setActiveCategories(prev=>prev.includes(cat)?prev.filter(c=>c!==cat):[...prev,cat])}
-                style={{padding:'4px 14px',borderRadius:20,fontSize:12,cursor:'pointer',fontWeight:isActive?600:400,border:isActive?`2px solid ${cc.border}`:'2px solid #e5e7eb',background:isActive?cc.bg:'white',color:isActive?cc.text:'#6b7280'}}>
-                {cat} <span style={{marginLeft:4,fontSize:11,opacity:0.7}}>{projects.filter(p=>p.category===cat).length}</span>
+                style={{padding:'5px 16px',borderRadius:20,fontSize:12,cursor:'pointer',fontWeight:isActive?600:400,border:isActive?`1.5px solid ${cc.border}`:'1.5px solid rgba(255,255,255,0.15)',background:isActive?`${cc.bg}22`:'rgba(255,255,255,0.05)',color:isActive?cc.border:'rgba(148,163,184,0.8)'}}>
+                {cat} <span style={{marginLeft:3,fontSize:11,opacity:0.7}}>{projects.filter(p=>p.category===cat).length}</span>
               </button>
             );
           })}
-          {activeCategories.length>0 && <button onClick={()=>setActiveCategories([])} style={{marginLeft:4,fontSize:12,color:'#9ca3af',background:'none',border:'none',cursor:'pointer',textDecoration:'underline'}}>초기화</button>}
+          {activeCategories.length>0 && <button onClick={()=>setActiveCategories([])} style={{marginLeft:4,fontSize:11,color:'rgba(148,163,184,0.6)',background:'none',border:'none',cursor:'pointer',textDecoration:'underline'}}>초기화</button>}
         </div>
 
         {/* 그룹 필터 */}
         {allGroups.length > 0 && (
-          <div style={{display:'flex',gap:8,marginTop:8,alignItems:'center',flexWrap:'wrap'}}>
-            <span style={{fontSize:12,color:'#9ca3af',flexShrink:0}}>그룹:</span>
+          <div style={{display:'flex',gap:6,marginTop:8,alignItems:'center',flexWrap:'wrap'}}>
+            <span style={{fontSize:11,color:'rgba(148,163,184,0.5)',flexShrink:0}}>그룹:</span>
             <button onClick={()=>setActiveGroup('')}
-              style={{padding:'4px 14px',borderRadius:20,fontSize:12,cursor:'pointer',fontWeight:activeGroup===''?600:400,border:activeGroup===''?'2px solid #6366f1':'2px solid #e5e7eb',background:activeGroup===''?'#eef2ff':'white',color:activeGroup===''?'#4338ca':'#6b7280'}}>
+              style={{padding:'3px 12px',borderRadius:20,fontSize:11,cursor:'pointer',fontWeight:activeGroup===''?600:400,border:activeGroup===''?'1.5px solid #818cf8':'1.5px solid rgba(255,255,255,0.12)',background:activeGroup===''?'rgba(99,102,241,0.2)':'rgba(255,255,255,0.04)',color:activeGroup===''?'#a5b4fc':'rgba(148,163,184,0.7)'}}>
               전체
             </button>
             {allGroups.map(g=>(
               <button key={g} onClick={()=>setActiveGroup(prev=>prev===g?'':g)}
-                style={{padding:'4px 14px',borderRadius:20,fontSize:12,cursor:'pointer',fontWeight:activeGroup===g?600:400,border:activeGroup===g?'2px solid #6366f1':'2px solid #e5e7eb',background:activeGroup===g?'#eef2ff':'white',color:activeGroup===g?'#4338ca':'#6b7280'}}>
-                {g} <span style={{fontSize:11,opacity:0.7}}>{projects.filter(p=>(p.group||'미분류')===g).length}</span>
+                style={{padding:'3px 12px',borderRadius:20,fontSize:11,cursor:'pointer',fontWeight:activeGroup===g?600:400,border:activeGroup===g?'1.5px solid #818cf8':'1.5px solid rgba(255,255,255,0.12)',background:activeGroup===g?'rgba(99,102,241,0.2)':'rgba(255,255,255,0.04)',color:activeGroup===g?'#a5b4fc':'rgba(148,163,184,0.7)'}}>
+                {g} <span style={{fontSize:10,opacity:0.6}}>{projects.filter(p=>(p.group||'미분류')===g).length}</span>
               </button>
             ))}
           </div>
@@ -657,7 +745,7 @@ export default function GanttChart() {
       </div>
 
       {/* Legend */}
-      <div style={{background:'white',borderTop:'1px solid #e5e7eb',padding:'8px 24px',display:'flex',alignItems:'center',gap:24,fontSize:12,color:'#6b7280',flexShrink:0,flexWrap:'wrap'}}>
+      <div style={{background:'linear-gradient(135deg,#0f0f1a,#1a1a2e)',borderTop:'1px solid rgba(255,255,255,0.08)',padding:'8px 24px',display:'flex',alignItems:'center',gap:24,fontSize:12,color:'rgba(148,163,184,0.7)',flexShrink:0,flexWrap:'wrap'}}>
         <div style={{display:'flex',alignItems:'center',gap:6}}><div style={{width:12,height:12,borderRadius:'50%',background:'#f87171'}} /><span>오늘</span></div>
         <div style={{display:'flex',alignItems:'center',gap:6}}><div style={{width:32,height:12,borderRadius:4,background:'linear-gradient(to right, #3b82f6 50%, #bfdbfe 50%)'}} /><span>진행률</span></div>
         <span style={{marginLeft:'auto',color:'#9ca3af'}}>바를 드래그하여 일정 조정 | 그룹명 더블클릭으로 이름 변경</span>
@@ -672,6 +760,8 @@ export default function GanttChart() {
 
       {editingProject && <ProjectEditModal proj={editingProject} onClose={()=>setEditingProject(null)} />}
       {editingTask && <TaskEditModal task={editingTask.task} pid={editingTask.pid} onClose={()=>setEditingTask(null)} />}
+      {/* ── 히스토리 모달 ── */}
+      {showHistory && <HistoryModal />}
     </div>
   );
 }
