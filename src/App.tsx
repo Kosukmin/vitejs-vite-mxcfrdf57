@@ -35,7 +35,6 @@ const CATEGORY_COLORS: Record<string, any> = {
   '개발': { bg:'#d1fae5', text:'#065f46', border:'#10b981' },
   '보안': { bg:'#fee2e2', text:'#991b1b', border:'#ef4444' },
 };
-const CATEGORY_ORDER: Record<string, number> = { '영업':0, '기획':1, '운영':2, '개발':3, '보안':4 };
 const CATEGORIES = ['영업','기획','운영','개발','보안'];
 
 const toDateStr = (d: Date) => d.toISOString().split('T')[0];
@@ -474,7 +473,6 @@ function GanttChart({ user, onLogout }: { user: any; onLogout: () => void }) {
     } else if (src.type === 'project' && target.type === 'project' && src.id !== target.id && src.group === target.group) {
       // 같은 그룹 내 프로젝트 순서 변경
       const grpProjs = projects.filter(p => (p.group||'미분류') === src.group);
-      const otherProjs = projects.filter(p => (p.group||'미분류') !== src.group);
       const srcIdx = grpProjs.findIndex((p:any) => p.id === src.id);
       const tgtIdx = grpProjs.findIndex((p:any) => p.id === target.id);
       const reordered = [...grpProjs];
@@ -628,7 +626,6 @@ function GanttChart({ user, onLogout }: { user: any; onLogout: () => void }) {
 
   const TaskEditModal = ({ task, pid, onClose }: any) => {
     const [fd, setFd] = useState({...task});
-    const others = projects.find(p=>p.id===pid)?.tasks.filter((t:any)=>t.id!==task.id)||[];
     return (
       <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:50,padding:16}}>
         <div style={{background:'white',borderRadius:12,padding:24,width:modalW,maxHeight:'90vh',overflowY:'auto',boxShadow:'0 20px 60px rgba(0,0,0,0.3)'}} onClick={e=>e.stopPropagation()}>
@@ -991,7 +988,6 @@ function GanttChart({ user, onLogout }: { user: any; onLogout: () => void }) {
                       })();
                       const catColor = CATEGORY_COLORS[proj.category];
                       const barBg = catColor ? catColor.border : c.bar;
-                      const barBgLight = catColor ? catColor.bg : c.barLight;
                       return (
                         <div key={proj.id}
                           onMouseEnter={e=>{setTooltip({startDate,endDate,name:proj.name});setTooltipPos({x:e.clientX,y:e.clientY});}}
@@ -1058,7 +1054,7 @@ function GanttChart({ user, onLogout }: { user: any; onLogout: () => void }) {
                                 onMouseLeave={()=>{if(!isProjDrag)setTooltip(null);}}>
                                 <div style={{position:'absolute',left:0,top:0,bottom:0,width:8,cursor:'ew-resize',zIndex:8,borderRadius:'4px 0 0 4px'}} onMouseDown={e=>handleMouseDown(e,proj.id,'__proj__','start')} />
                                 <div style={{width:`${projProg}%`,height:'100%',background:catColor?catColor.border:c.bar,borderRadius:4,overflow:'hidden'}} />
-                                <div style={{position:'absolute',inset:0,display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,color:projProg>50?'#fff':catColor?catColor.text:c.text,fontWeight:600,pointerEvents:'none'}}>{projProg}%</div>
+                                {projPos.width>40 ? <div style={{position:'absolute',inset:0,display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,color:projProg>50?'#fff':catColor?catColor.text:c.text,fontWeight:600,pointerEvents:'none'}}>{projProg}%</div> : <div style={{position:'absolute',left:projPos.width+5,top:'50%',transform:'translateY(-50%)',whiteSpace:'nowrap',fontSize:11,color:'#374151',fontWeight:600,pointerEvents:'none'}}>{projProg}%</div>}
                                 <div style={{position:'absolute',right:0,top:0,bottom:0,width:8,cursor:'ew-resize',zIndex:8,borderRadius:'0 4px 4px 0'}} onMouseDown={e=>handleMouseDown(e,proj.id,'__proj__','end')} />
                               </div>
                             );
@@ -1066,7 +1062,7 @@ function GanttChart({ user, onLogout }: { user: any; onLogout: () => void }) {
                           {projPos && proj.tasks.length>0 && (
                             <div style={{position:'absolute',left:projPos.left,width:projPos.width,height:22,top:'50%',transform:'translateY(-50%)',background:catColor?catColor.bg:c.barLight,borderRadius:4,overflow:'hidden',border:`1px solid ${catColor?catColor.border:c.bar}55`,zIndex:6}}>
                               <div style={{width:`${projProg}%`,height:'100%',background:catColor?catColor.border:c.bar,borderRadius:4}} />
-                              <div style={{position:'absolute',inset:0,display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,color:projProg>50?'#fff':catColor?catColor.text:c.text,fontWeight:600}}>{projProg}%</div>
+                              {projPos.width>40 ? <div style={{position:'absolute',inset:0,display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,color:projProg>50?'#fff':catColor?catColor.text:c.text,fontWeight:600}}>{projProg}%</div> : <div style={{position:'absolute',left:projPos.width+5,top:'50%',transform:'translateY(-50%)',whiteSpace:'nowrap',fontSize:11,color:'#374151',fontWeight:600}}>{projProg}%</div>}
                             </div>
                           )}
                         </div>
@@ -1112,7 +1108,7 @@ function GanttChart({ user, onLogout }: { user: any; onLogout: () => void }) {
                                   onMouseLeave={()=>{if(!isDrag)setTooltip(null);}}>
                                   <div style={{position:'absolute',left:0,top:0,bottom:0,width:8,cursor:'ew-resize',zIndex:8,borderRadius:'5px 0 0 5px'}} onMouseDown={e=>handleMouseDown(e,proj.id,task.id,'start')} />
                                   <div style={{width:`${task.progress||0}%`,height:'100%',background:catColor?catColor.border:c.bar,borderRadius:4,pointerEvents:'none'}} />
-                                  <div style={{position:'absolute',inset:0,display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,fontWeight:600,pointerEvents:'none',color:(task.progress||0)>50?'#fff':catColor?catColor.text:c.text}}>{task.progress||0}%</div>
+                                  {pos.width>40 ? <div style={{position:'absolute',inset:0,display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,fontWeight:600,pointerEvents:'none',color:(task.progress||0)>50?'#fff':catColor?catColor.text:c.text}}>{task.progress||0}%</div> : <div style={{position:'absolute',left:pos.width+5,top:'50%',transform:'translateY(-50%)',whiteSpace:'nowrap',fontSize:11,fontWeight:600,pointerEvents:'none',color:'#374151'}}>{task.progress||0}%</div>}
                                   <div style={{position:'absolute',right:0,top:0,bottom:0,width:8,cursor:'ew-resize',zIndex:8,borderRadius:'0 5px 5px 0'}} onMouseDown={e=>handleMouseDown(e,proj.id,task.id,'end')} />
                                 </div>
                               )}
