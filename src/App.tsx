@@ -478,10 +478,6 @@ function GanttChart({ user, onLogout }: { user: any; onLogout: () => void }) {
 
   const ProjectEditModal = ({ proj, onClose }: any) => {
     const [fd, setFd] = useState({...proj});
-    const colorOpts = [
-      {name:'blue',label:'파랑',color:'#3b82f6'},{name:'green',label:'초록',color:'#22c55e'},
-      {name:'purple',label:'보라',color:'#a855f7'},{name:'orange',label:'주황',color:'#f97316'},{name:'pink',label:'분홍',color:'#ec4899'},
-    ];
     return (
       <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:50,padding:16}}>
         <div style={{background:'white',borderRadius:12,padding:24,width:modalW,boxShadow:'0 20px 60px rgba(0,0,0,0.3)',maxHeight:'90vh',overflowY:'auto'}} onClick={e=>e.stopPropagation()}>
@@ -496,11 +492,18 @@ function GanttChart({ user, onLogout }: { user: any; onLogout: () => void }) {
               <input value={fd.owner||''} onChange={e=>setFd({...fd,owner:e.target.value})} style={inp()} /></div>
             <div>
               <label style={{display:'block',fontSize:14,fontWeight:500,marginBottom:4}}>그룹 <span style={{fontSize:12,color:'#9ca3af',fontWeight:400}}>(서비스/제품 단위)</span></label>
+              {allGroups.length > 0 && (
+                <div style={{display:'flex',gap:6,flexWrap:'wrap',marginBottom:8}}>
+                  {allGroups.map(g=>(
+                    <button key={g} type="button" onClick={()=>setFd({...fd,group:g})}
+                      style={{padding:'5px 14px',borderRadius:16,fontSize:12,cursor:'pointer',border:`1.5px solid ${fd.group===g?'#6366f1':'#e5e7eb'}`,background:fd.group===g?'#eef2ff':'#f9fafb',color:fd.group===g?'#4f46e5':'#6b7280',fontWeight:fd.group===g?600:400}}>
+                      {g}
+                    </button>
+                  ))}
+                </div>
+              )}
               <input value={fd.group||''} onChange={e=>setFd({...fd,group:e.target.value})}
-                placeholder="예: 대시보드, 방문자예약시스템" style={inp()} list="group-suggestions" />
-              <datalist id="group-suggestions">
-                {allGroups.map(g=><option key={g} value={g} />)}
-              </datalist>
+                placeholder="그룹명 직접 입력 또는 수정" style={inp()} />
             </div>
             <div>
               <label style={{display:'block',fontSize:14,fontWeight:500,marginBottom:8}}>카테고리</label>
@@ -510,18 +513,6 @@ function GanttChart({ user, onLogout }: { user: any; onLogout: () => void }) {
                   return <button key={cat} onClick={()=>setFd({...fd,category:cat})}
                     style={{padding:'6px 16px',borderRadius:20,border:`2px solid ${fd.category===cat?cc.border:'#e5e7eb'}`,background:fd.category===cat?cc.bg:'white',color:fd.category===cat?cc.text:'#6b7280',cursor:'pointer',fontSize:13,fontWeight:fd.category===cat?600:400}}>{cat}</button>;
                 })}
-              </div>
-            </div>
-            <div>
-              <label style={{display:'block',fontSize:14,fontWeight:500,marginBottom:8}}>색상</label>
-              <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
-                {colorOpts.map(o=>(
-                  <button key={o.name} onClick={()=>setFd({...fd,color:o.name})}
-                    style={{display:'flex',flexDirection:'column',alignItems:'center',gap:4,padding:8,borderRadius:8,border:fd.color===o.name?'2px solid #111':'2px solid #e5e7eb',background:'white',cursor:'pointer'}}>
-                    <div style={{width:24,height:24,borderRadius:'50%',background:o.color}} />
-                    <span style={{fontSize:11}}>{o.label}</span>
-                  </button>
-                ))}
               </div>
             </div>
             <div>
