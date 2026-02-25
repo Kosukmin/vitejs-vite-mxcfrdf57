@@ -108,6 +108,7 @@ function LoginScreen({ onLogin }: { onLogin: (user: any) => void }) {
 export default function App() {
   const [user, setUser] = useState<any>(null);
   const [authLoading, setAuthLoading] = useState(true);
+  const [isResetMode, setIsResetMode] = useState(false);
 
   useEffect(() => {
     // 기존 세션 확인
@@ -115,9 +116,14 @@ export default function App() {
       setUser(data.session?.user ?? null);
       setAuthLoading(false);
     });
-    // 세션 변경 감지
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
+    // 세션 변경 감지 - PASSWORD_RECOVERY 이벤트 처리
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        setUser(session?.user ?? null);
+        setIsResetMode(true);
+      } else {
+        setUser(session?.user ?? null);
+      }
     });
     return () => subscription.unsubscribe();
   }, []);
@@ -129,10 +135,82 @@ export default function App() {
     </div>
   );
 
+  // 비밀번호 재설정 모드 - 별도 화면
+  if (isResetMode && user) return (
+    <ResetPasswordScreen user={user} onDone={async () => {
+      setIsResetMode(false);
+    }} />
+  );
+
   if (!user) return <LoginScreen onLogin={setUser} />;
 
   return <GanttChart user={user} onLogout={async () => { await supabase.auth.signOut(); setUser(null); }} />;
 }
+
+// ── 비밀번호 재설정 화면 (이메일 링크 클릭 후) ──────────
+function ResetPasswordScreen({ user, onDone }: { user: any; onDone: () => void }) {
+  const [newPw, setNewPw]         = useState('');
+  const [confirmPw, setConfirmPw] = useState('');
+  const [error, setError]         = useState('');
+  const [success, setSuccess]     = useState(false);
+  const [loading, setLoading]     = useState(false);
+
+  const handleReset = async () => {
+    setError('');
+    if (!newPw || !confirmPw) { setError('모든 항목을 입력해주세요.'); return; }
+    if (newPw.length < 6) { setError('비밀번호는 6자 이상이어야 합니다.'); return; }
+    if (newPw !== confirmPw) { setError('비밀번호가 일치하지 않습니다.'); return; }
+    setLoading(true);
+    try {
+      const { error: err } = await supabase.auth.updateUser({ password: newPw });
+      if (err) { setError('비밀번호 변경에 실패했습니다.'); }
+      else { setSuccess(true); setTimeout(() => onDone(), 2000); }
+    } catch { setError('오류가 발생했습니다.'); }
+    finally { setLoading(false); }
+  };
+
+  return (
+    <div style={{minHeight:'100vh',background:'linear-gradient(135deg,#0f0f1a 0%,#1a1a2e 60%,#16213e 100%)',display:'flex',alignItems:'center',justifyContent:'center',fontFamily:"'Pretendard',-apple-system,BlinkMacSystemFont,sans-serif"}}>
+      <style>{`@import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css'); @keyframes spin{to{transform:rotate(360deg)}} *{box-sizing:border-box;}`}</style>
+      <div style={{width:'100%',maxWidth:400,padding:'0 24px'}}>
+        <div style={{textAlign:'center',marginBottom:36}}>
+          <div style={{width:56,height:56,borderRadius:16,background:'linear-gradient(135deg,#6366f1,#a855f7)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:28,margin:'0 auto 16px',boxShadow:'0 4px 20px rgba(99,102,241,0.4)'}}>🔑</div>
+          <h1 style={{fontSize:20,fontWeight:'bold',color:'#f1f5f9',margin:'0 0 6px'}}>새 비밀번호 설정</h1>
+          <p style={{fontSize:13,color:'rgba(148,163,184,0.6)',margin:0}}>{user.email}</p>
+        </div>
+        <div style={{background:'rgba(255,255,255,0.05)',borderRadius:16,padding:28,border:'1px solid rgba(255,255,255,0.1)'}}>
+          {success ? (
+            <div style={{textAlign:'center',padding:'20px 0'}}>
+              <div style={{fontSize:40,marginBottom:12}}>✅</div>
+              <p style={{color:'#4ade80',fontSize:15,fontWeight:600,margin:0}}>비밀번호가 변경되었습니다!</p>
+              <p style={{color:'rgba(148,163,184,0.6)',fontSize:13,marginTop:8}}>잠시 후 로그인 화면으로 이동합니다...</p>
+            </div>
+          ) : (
+            <>
+              <div style={{marginBottom:16}}>
+                <label style={{display:'block',fontSize:13,color:'rgba(148,163,184,0.8)',marginBottom:7,fontWeight:500}}>새 비밀번호 <span style={{fontSize:11,opacity:0.6}}>(6자 이상)</span></label>
+                <input type="password" value={newPw} onChange={e=>setNewPw(e.target.value)} placeholder="새 비밀번호 입력"
+                  style={{width:'100%',padding:'11px 14px',background:'rgba(255,255,255,0.07)',border:'1px solid rgba(255,255,255,0.12)',borderRadius:10,fontSize:14,color:'#f1f5f9',outline:'none'}} />
+              </div>
+              <div style={{marginBottom:20}}>
+                <label style={{display:'block',fontSize:13,color:'rgba(148,163,184,0.8)',marginBottom:7,fontWeight:500}}>새 비밀번호 확인</label>
+                <input type="password" value={confirmPw} onChange={e=>setConfirmPw(e.target.value)}
+                  onKeyDown={e=>e.key==='Enter'&&handleReset()} placeholder="새 비밀번호 재입력"
+                  style={{width:'100%',padding:'11px 14px',background:'rgba(255,255,255,0.07)',border:'1px solid rgba(255,255,255,0.12)',borderRadius:10,fontSize:14,color:'#f1f5f9',outline:'none'}} />
+              </div>
+              {error && <div style={{background:'rgba(239,68,68,0.1)',border:'1px solid rgba(239,68,68,0.3)',borderRadius:8,padding:'10px 14px',marginBottom:16,fontSize:13,color:'#fca5a5'}}>⚠️ {error}</div>}
+              <button onClick={handleReset} disabled={loading}
+                style={{width:'100%',padding:'12px',background:loading?'rgba(99,102,241,0.5)':'linear-gradient(135deg,#6366f1,#8b5cf6)',color:'white',border:'none',borderRadius:10,fontSize:15,fontWeight:600,cursor:loading?'not-allowed':'pointer',display:'flex',alignItems:'center',justifyContent:'center',gap:8}}>
+                {loading ? <><div style={{width:16,height:16,border:'2px solid rgba(255,255,255,0.3)',borderTopColor:'white',borderRadius:'50%',animation:'spin 0.8s linear infinite'}} />변경 중...</> : '비밀번호 변경'}
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+// ────────────────────────────────────────────────────
 
 function GanttChart({ user, onLogout }: { user: any; onLogout: () => void }) {
   const [cols, setCols] = useState(() => calcCols(window.innerWidth));
