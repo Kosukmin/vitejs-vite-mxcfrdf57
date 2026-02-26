@@ -283,16 +283,22 @@ function GanttChart({ user, onLogout }: { user: any; onLogout: () => void }) {
 
   // 레인 배분 알고리즘: 겹치지 않는 task는 같은 행, 겹치면 다음 행
   const assignLanes = (tasks: any[]) => {
-    const BAR_GAP_PX = 4; // 바 사이 최소 픽셀 간격
-    const laneEnds: number[] = []; // 각 레인의 현재 마지막 right px
-    return tasks.map(task => {
+    const BAR_GAP_PX = 4;
+    const laneEnds: number[] = [];
+    // 시작일 기준 오름차순 정렬 후 레인 배분 (원래 순서 인덱스 보존)
+    const sorted = [...tasks]
+      .map((task, origIdx) => ({ task, origIdx }))
+      .sort((a, b) => (a.task.startDate || '').localeCompare(b.task.startDate || ''));
+    const result: { task: any; lane: number; pos: any }[] = new Array(tasks.length);
+    sorted.forEach(({ task, origIdx }) => {
       const pos = getPos(task.startDate, task.endDate);
-      if (!pos) return { task, lane: 0, pos: null };
+      if (!pos) { result[origIdx] = { task, lane: 0, pos: null }; return; }
       const laneIdx = laneEnds.findIndex(end => end + BAR_GAP_PX <= pos.left);
       const lane = laneIdx === -1 ? laneEnds.length : laneIdx;
       laneEnds[lane] = pos.left + pos.width;
-      return { task, lane, pos };
+      result[origIdx] = { task, lane, pos };
     });
+    return result;
   };
 
   useEffect(() => { load(); }, []);
