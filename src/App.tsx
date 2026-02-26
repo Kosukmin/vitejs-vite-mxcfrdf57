@@ -111,12 +111,10 @@ export default function App() {
   const [isResetMode, setIsResetMode] = useState(false);
 
   useEffect(() => {
-    // 기존 세션 확인
     supabase.auth.getSession().then(({ data }) => {
       setUser(data.session?.user ?? null);
       setAuthLoading(false);
     });
-    // 세션 변경 감지 - PASSWORD_RECOVERY 이벤트 처리
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'PASSWORD_RECOVERY') {
         setUser(session?.user ?? null);
@@ -135,7 +133,6 @@ export default function App() {
     </div>
   );
 
-  // 비밀번호 재설정 모드 - 별도 화면
   if (isResetMode && user) return (
     <ResetPasswordScreen user={user} onDone={async () => {
       setIsResetMode(false);
@@ -147,7 +144,7 @@ export default function App() {
   return <GanttChart user={user} onLogout={async () => { await supabase.auth.signOut(); setUser(null); }} />;
 }
 
-// ── 비밀번호 재설정 화면 (이메일 링크 클릭 후) ──────────
+// ── 비밀번호 재설정 화면 ──────────
 function ResetPasswordScreen({ user, onDone }: { user: any; onDone: () => void }) {
   const [newPw, setNewPw]         = useState('');
   const [confirmPw, setConfirmPw] = useState('');
@@ -231,24 +228,19 @@ function GanttChart({ user, onLogout }: { user: any; onLogout: () => void }) {
   const [tooltip, setTooltip]                 = useState<any>(null);
   const [tooltipPos, setTooltipPos]           = useState({ x:0, y:0 });
 
-  // ── 히스토리 상태 ──────────────────────────────────
   const [showHistory, setShowHistory]         = useState(false);
   const [history, setHistory]                 = useState<any[]>([]);
   const [historyLoading, setHistoryLoading]   = useState(false);
   const [restoring, setRestoring]             = useState(false);
-  // ── 비밀번호 변경 상태 ─────────────────────────────
   const [showChangePw, setShowChangePw]       = useState(false);
-  // ── 행 드래그앤드롭 상태 ──────────────────────────
   const [rowDrag, setRowDrag]                 = useState<any>(null);
   const [rowDragOver, setRowDragOver]         = useState<any>(null);
   const [groupOrder, setGroupOrder]           = useState<string[]>([]);
-  // ────────────────────────────────────────────────────
-  // ────────────────────────────────────────────────────
 
   const dragRef        = useRef<any>(null);
   const rowDragRef     = useRef<any>(null);
   const historyTimer   = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const HISTORY_DEBOUNCE_MS = 5 * 60 * 1000; // 5분
+  const HISTORY_DEBOUNCE_MS = 5 * 60 * 1000;
 
   useEffect(() => {
     const onResize = () => setCols(calcCols(window.innerWidth));
@@ -270,36 +262,34 @@ function GanttChart({ user, onLogout }: { user: any; onLogout: () => void }) {
   const load = async () => {
     setLoading(true);
     try {
+      // 샌디버스: id = 1
       const { data, error } = await supabase.from('gantt_projects').select('data').eq('id', 1).single();
       if (!error && data) setProjects(data.data || []);
     } catch {}
     finally { setLoading(false); }
   };
 
-  // ── 히스토리 스냅샷 (직접 호출용) ───────────────────
   const saveHistorySnapshot = async (p: any[], memo?: string) => {
     try {
       await supabase.from('gantt_history').insert({ data: p, memo: memo || '' });
     } catch {}
   };
 
-  // ── 저장 (간트 데이터) + 5분 디바운스 히스토리 ─────
   const save = async (p: any[], memo?: string) => {
     setProjects(p);
     setSaving(true);
     try {
+      // 샌디버스: id = 1
       await supabase.from('gantt_projects').upsert({ id: 1, data: p });
     } catch {}
     finally { setSaving(false); }
 
-    // 히스토리: 마지막 변경 후 5분 뒤에 한 번만 스냅샷
     if (historyTimer.current) clearTimeout(historyTimer.current);
     historyTimer.current = setTimeout(() => {
       saveHistorySnapshot(p, memo);
     }, HISTORY_DEBOUNCE_MS);
   };
 
-  // ── 히스토리 목록 불러오기 ────────────────────────
   const loadHistory = async () => {
     setHistoryLoading(true);
     setShowHistory(true);
@@ -314,16 +304,15 @@ function GanttChart({ user, onLogout }: { user: any; onLogout: () => void }) {
     finally { setHistoryLoading(false); }
   };
 
-  // ── 특정 시점으로 복원 ────────────────────────────
   const restoreHistory = async (id: number) => {
     if (!confirm('이 시점으로 복원할까요?\n현재 데이터는 덮어쓰여집니다.')) return;
     setRestoring(true);
     try {
       const { data } = await supabase.from('gantt_history').select('data').eq('id', id).single();
       if (data) {
-        // 복원은 간트 저장 + 즉시 스냅샷
         setProjects(data.data);
         setSaving(true);
+        // 샌디버스: id = 1
         try { await supabase.from('gantt_projects').upsert({ id: 1, data: data.data }); } catch {}
         finally { setSaving(false); }
         await saveHistorySnapshot(data.data, '복원됨');
@@ -335,7 +324,6 @@ function GanttChart({ user, onLogout }: { user: any; onLogout: () => void }) {
     }
     finally { setRestoring(false); }
   };
-  // ────────────────────────────────────────────────────
 
   const addProject = () => save([...projects, {
     id:Date.now(), name:'새 프로젝트', owner:'', description:'',
@@ -425,7 +413,6 @@ function GanttChart({ user, onLogout }: { user: any; onLogout: () => void }) {
     return () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
   }, [dragging, TIMELINE_W]);
 
-  // groupOrder 기반으로 그룹 순서 관리
   const rawGroups = Array.from(new Set(projects.map(p => p.group || '미분류')));
   const allGroups = [
     ...groupOrder.filter(g => rawGroups.includes(g)),
@@ -440,14 +427,12 @@ function GanttChart({ user, onLogout }: { user: any; onLogout: () => void }) {
       p.owner?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       p.tasks.some((t:any)=>t.name.toLowerCase().includes(searchQuery.toLowerCase())||t.assignee?.toLowerCase().includes(searchQuery.toLowerCase()))
     );
-    // 드래그앤드롭 순서 유지를 위해 sort 제거
 
   const groupedFiltered = allGroups
     .filter(g => activeGroup==='' || g===activeGroup)
     .map(g => ({ name:g, items: filtered.filter(p=>(p.group||'미분류')===g) }))
     .filter(g => g.items.length > 0);
 
-  // ── 행 드래그앤드롭 핸들러 ──────────────────────────
   const handleRowDragStart = (e: React.DragEvent, info: any) => {
     rowDragRef.current = info;
     setRowDrag(info);
@@ -465,20 +450,17 @@ function GanttChart({ user, onLogout }: { user: any; onLogout: () => void }) {
     if (!src || !target) { setRowDrag(null); setRowDragOver(null); return; }
 
     if (src.type === 'group' && target.type === 'group' && src.name !== target.name) {
-      // 그룹 순서 변경
       const cur = allGroups.filter(g => g !== src.name);
       const ti = cur.indexOf(target.name);
       cur.splice(ti, 0, src.name);
       setGroupOrder(cur);
     } else if (src.type === 'project' && target.type === 'project' && src.id !== target.id && src.group === target.group) {
-      // 같은 그룹 내 프로젝트 순서 변경
       const grpProjs = projects.filter(p => (p.group||'미분류') === src.group);
       const srcIdx = grpProjs.findIndex((p:any) => p.id === src.id);
       const tgtIdx = grpProjs.findIndex((p:any) => p.id === target.id);
       const reordered = [...grpProjs];
       reordered.splice(srcIdx, 1);
       reordered.splice(tgtIdx, 0, grpProjs[srcIdx]);
-      // 전체 projects 재조합 (그룹 순서 유지)
       const newProjects: any[] = [];
       allGroups.forEach(g => {
         if (g === src.group) newProjects.push(...reordered);
@@ -486,7 +468,6 @@ function GanttChart({ user, onLogout }: { user: any; onLogout: () => void }) {
       });
       save(newProjects);
     } else if (src.type === 'task' && target.type === 'task' && src.tid !== target.tid && src.pid === target.pid) {
-      // 같은 프로젝트 내 Task 순서 변경
       const newProjects = projects.map((p:any) => {
         if (p.id !== src.pid) return p;
         const tasks = [...p.tasks];
@@ -501,7 +482,6 @@ function GanttChart({ user, onLogout }: { user: any; onLogout: () => void }) {
     setRowDrag(null); setRowDragOver(null);
   };
   const handleRowDragEnd = () => { setRowDrag(null); setRowDragOver(null); };
-  // ────────────────────────────────────────────────────
 
   const exportCSV = () => {
     const headers = ['그룹','카테고리','프로젝트','오너','프로젝트 시작일','프로젝트 종료일','프로젝트 진행률','프로젝트 설명','Task','Task 설명','담당자','Task 시작일','Task 종료일','Task 진행률'];
@@ -552,7 +532,6 @@ function GanttChart({ user, onLogout }: { user: any; onLogout: () => void }) {
               <input value={fd.owner||''} onChange={e=>setFd({...fd,owner:e.target.value})} style={inp()} /></div>
             <div>
               <label style={{display:'block',fontSize:14,fontWeight:500,marginBottom:8}}>그룹 <span style={{fontSize:12,color:'#9ca3af',fontWeight:400}}>(서비스/제품 단위)</span></label>
-              {/* 기존 그룹 버튼 선택 */}
               <div style={{display:'flex',gap:6,flexWrap:'wrap',marginBottom:8}}>
                 {allGroups.filter(g=>g!=='미분류').map(g=>(
                   <button key={g} type="button" onClick={()=>setFd({...fd,group:g})}
@@ -565,7 +544,6 @@ function GanttChart({ user, onLogout }: { user: any; onLogout: () => void }) {
                   미분류
                 </button>
               </div>
-              {/* 새 그룹 직접 입력 */}
               <input value={(!allGroups.filter(g=>g!=='미분류').includes(fd.group) && fd.group && fd.group!=='미분류') ? fd.group : ''}
                 onChange={e=>setFd({...fd,group:e.target.value})}
                 placeholder="+ 새 그룹 직접 입력"
@@ -581,7 +559,6 @@ function GanttChart({ user, onLogout }: { user: any; onLogout: () => void }) {
                 })}
               </div>
             </div>
-
             <div>
               <label style={{display:'block',fontSize:14,fontWeight:500,marginBottom:4}}>프로젝트 기간 <span style={{fontSize:12,color:'#9ca3af',fontWeight:400}}>(Task 없을 때)</span></label>
               <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
@@ -634,7 +611,6 @@ function GanttChart({ user, onLogout }: { user: any; onLogout: () => void }) {
             </div>
             <div><label style={{display:'block',fontSize:14,fontWeight:500,marginBottom:4}}>진행률: <span style={{color:'#3b82f6',fontWeight:'bold'}}>{fd.progress}%</span></label>
               <input type="range" min="0" max="100" value={fd.progress} onChange={e=>setFd({...fd,progress:Number(e.target.value)})} style={{width:'100%'}} /></div>
-
           </div>
           <div style={{display:'flex',justifyContent:'flex-end',gap:8,marginTop:24}}>
             <button onClick={onClose} style={{padding:'8px 16px',border:'1px solid #d1d5db',borderRadius:8,background:'white',cursor:'pointer',fontSize:14}}>취소</button>
@@ -645,7 +621,6 @@ function GanttChart({ user, onLogout }: { user: any; onLogout: () => void }) {
     );
   };
 
-  // ── 비밀번호 변경 모달 ───────────────────────────────
   const ChangePwModal = () => {
     const [currentPw, setCurrentPw] = useState('');
     const [newPw, setNewPw]         = useState('');
@@ -661,10 +636,8 @@ function GanttChart({ user, onLogout }: { user: any; onLogout: () => void }) {
       if (newPw !== confirmPw) { setPwError('새 비밀번호가 일치하지 않습니다.'); return; }
       setPwLoading(true);
       try {
-        // 현재 비밀번호 확인 (재로그인)
         const { error: signInErr } = await supabase.auth.signInWithPassword({ email: user.email, password: currentPw });
         if (signInErr) { setPwError('현재 비밀번호가 올바르지 않습니다.'); setPwLoading(false); return; }
-        // 비밀번호 변경
         const { error: updateErr } = await supabase.auth.updateUser({ password: newPw });
         if (updateErr) { setPwError('비밀번호 변경 중 오류가 발생했습니다.'); }
         else { setPwSuccess(true); setTimeout(() => setShowChangePw(false), 1500); }
@@ -719,15 +692,12 @@ function GanttChart({ user, onLogout }: { user: any; onLogout: () => void }) {
       </div>
     );
   };
-  // ────────────────────────────────────────────────────
 
-  // ── 히스토리 모달 ─────────────────────────────────
   const HistoryModal = () => (
     <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:50,padding:16}}
       onClick={()=>setShowHistory(false)}>
       <div style={{background:'white',borderRadius:12,padding:24,width:Math.min(480, window.innerWidth*0.95),maxHeight:'75vh',display:'flex',flexDirection:'column',boxShadow:'0 20px 60px rgba(0,0,0,0.3)'}}
         onClick={e=>e.stopPropagation()}>
-        {/* 모달 헤더 */}
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16,flexShrink:0}}>
           <div>
             <h3 style={{margin:0,fontSize:18,fontWeight:'bold'}}>🕐 저장 히스토리</h3>
@@ -735,8 +705,6 @@ function GanttChart({ user, onLogout }: { user: any; onLogout: () => void }) {
           </div>
           <button onClick={()=>setShowHistory(false)} style={{border:'none',background:'none',cursor:'pointer',fontSize:20,color:'#9ca3af',flexShrink:0}}>✕</button>
         </div>
-
-        {/* 목록 */}
         <div style={{overflowY:'auto',flex:1}}>
           {historyLoading ? (
             <div style={{display:'flex',alignItems:'center',justifyContent:'center',padding:'48px 0',gap:10,color:'#6b7280'}}>
@@ -776,7 +744,6 @@ function GanttChart({ user, onLogout }: { user: any; onLogout: () => void }) {
       </div>
     </div>
   );
-  // ────────────────────────────────────────────────────
 
   if (loading) return (
     <div style={{display:'flex',alignItems:'center',justifyContent:'center',height:'100vh',flexDirection:'column',gap:12,color:'#6b7280'}}>
@@ -796,7 +763,7 @@ function GanttChart({ user, onLogout }: { user: any; onLogout: () => void }) {
         *{box-sizing:border-box; font-family:'Pretendard',-apple-system,BlinkMacSystemFont,sans-serif;}
       `}</style>
 
-      {/* Header - 다크 테마 */}
+      {/* Header */}
       <div style={{background:'linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 60%, #16213e 100%)',borderBottom:'1px solid rgba(255,255,255,0.08)',padding:'16px 24px',flexShrink:0,boxShadow:'0 2px 16px rgba(0,0,0,0.4)',position:'sticky',top:0,zIndex:30}}>
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:8}}>
           <div style={{display:'flex',alignItems:'center',gap:12}}>
@@ -843,7 +810,7 @@ function GanttChart({ user, onLogout }: { user: any; onLogout: () => void }) {
           </div>
         </div>
 
-        {/* 카테고리 + 그룹 필터 - 1줄 */}
+        {/* 카테고리 + 그룹 필터 */}
         <div style={{display:'flex',gap:6,marginTop:12,alignItems:'center',flexWrap:'wrap'}}>
           <span style={{fontSize:12,color:'rgba(255,255,255,0.6)',flexShrink:0,fontWeight:500}}>카테고리:</span>
           <button onClick={()=>setActiveCategories([])}
@@ -877,7 +844,7 @@ function GanttChart({ user, onLogout }: { user: any; onLogout: () => void }) {
           </>}
         </div>
 
-        {/* 카테고리 범례 + Legend - 다크 헤더 하단 */}
+        {/* Legend */}
         <div style={{display:'flex',alignItems:'center',gap:16,marginTop:10,flexWrap:'wrap',paddingTop:10,borderTop:'1px solid rgba(255,255,255,0.07)'}}>
           <div style={{display:'flex',alignItems:'center',gap:5,flexShrink:0}}>
             {(['영업','기획','운영','개발','보안'] as string[]).map(cat=>{
@@ -917,7 +884,6 @@ function GanttChart({ user, onLogout }: { user: any; onLogout: () => void }) {
               </div>
             ) : groupedFiltered.map(group=>(
               <React.Fragment key={group.name}>
-
                 {/* 그룹 헤더 */}
                 <div draggable
                   onDragStart={e=>handleRowDragStart(e,{type:'group',name:group.name})}
@@ -954,7 +920,6 @@ function GanttChart({ user, onLogout }: { user: any; onLogout: () => void }) {
                   <div style={{width:TIMELINE_W,minWidth:TIMELINE_W,flexShrink:0,position:'relative',minHeight:collapsedGroups.has(group.name)?Math.max(44,group.items.length*26+12):44}}>
                     {MONTHS.map((_,i)=><div key={i} style={{width:MONTH_COL,height:'100%',position:'absolute',left:i*MONTH_COL,top:0,borderRight:i<11?'1px solid #e8ecf8':'none'}} />)}
                     {todayLeft!==null && <div style={{position:'absolute',left:todayLeft,top:0,bottom:0,width:2,background:'#ef4444',opacity:0.3,zIndex:5}} />}
-                    {/* 접혔을 때 프로젝트 기간바 미리보기 */}
                     {collapsedGroups.has(group.name) && group.items.map((proj:any, pi:number) => {
                       const { pos } = getProjectMeta(proj);
                       const c = COLOR_MAP[proj.color] || COLOR_MAP.blue;
@@ -1040,7 +1005,11 @@ function GanttChart({ user, onLogout }: { user: any; onLogout: () => void }) {
                                 onMouseLeave={()=>{if(!isProjDrag)setTooltip(null);}}>
                                 <div style={{position:'absolute',left:0,top:0,bottom:0,width:8,cursor:'ew-resize',zIndex:8,borderRadius:'4px 0 0 4px'}} onMouseDown={e=>handleMouseDown(e,proj.id,'__proj__','start')} />
                                 <div style={{width:`${projProg}%`,height:'100%',background:catColor?catColor.border:c.bar,borderRadius:4,overflow:'hidden'}} />
-                                {projPos.width>40 ? <div style={{position:'absolute',inset:0,display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,color:'#fff',fontWeight:700,pointerEvents:'none',textShadow:'0 1px 3px rgba(0,0,0,0.5)'}}>{projProg}%</div> : <div style={{position:'absolute',left:projPos.width+5,top:'50%',transform:'translateY(-50%)',whiteSpace:'nowrap',fontSize:11,color:'#374151',fontWeight:600,pointerEvents:'none'}}>{projProg}%</div>}
+                                {/* ✅ 진행률 숫자 - 검은색 */}
+                                {projPos.width>40
+                                  ? <div style={{position:'absolute',inset:0,display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,color:'#1f2937',fontWeight:700,pointerEvents:'none'}}>{projProg}%</div>
+                                  : <div style={{position:'absolute',left:projPos.width+5,top:'50%',transform:'translateY(-50%)',whiteSpace:'nowrap',fontSize:11,color:'#374151',fontWeight:600,pointerEvents:'none'}}>{projProg}%</div>
+                                }
                                 <div style={{position:'absolute',right:0,top:0,bottom:0,width:8,cursor:'ew-resize',zIndex:8,borderRadius:'0 4px 4px 0'}} onMouseDown={e=>handleMouseDown(e,proj.id,'__proj__','end')} />
                               </div>
                             );
@@ -1048,7 +1017,11 @@ function GanttChart({ user, onLogout }: { user: any; onLogout: () => void }) {
                           {projPos && proj.tasks.length>0 && (
                             <div style={{position:'absolute',left:projPos.left,width:projPos.width,height:22,top:'50%',transform:'translateY(-50%)',background:catColor?catColor.bg:c.barLight,borderRadius:4,overflow:'hidden',border:`1px solid ${catColor?catColor.border:c.bar}55`,zIndex:6}}>
                               <div style={{width:`${projProg}%`,height:'100%',background:catColor?catColor.border:c.bar,borderRadius:4}} />
-                              {projPos.width>40 ? <div style={{position:'absolute',inset:0,display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,color:'#fff',fontWeight:700,textShadow:'0 1px 3px rgba(0,0,0,0.5)'}}>{projProg}%</div> : <div style={{position:'absolute',left:projPos.width+5,top:'50%',transform:'translateY(-50%)',whiteSpace:'nowrap',fontSize:11,color:'#374151',fontWeight:600}}>{projProg}%</div>}
+                              {/* ✅ 진행률 숫자 - 검은색 */}
+                              {projPos.width>40
+                                ? <div style={{position:'absolute',inset:0,display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,color:'#1f2937',fontWeight:700}}>{projProg}%</div>
+                                : <div style={{position:'absolute',left:projPos.width+5,top:'50%',transform:'translateY(-50%)',whiteSpace:'nowrap',fontSize:11,color:'#374151',fontWeight:600}}>{projProg}%</div>
+                              }
                             </div>
                           )}
                         </div>
@@ -1057,7 +1030,6 @@ function GanttChart({ user, onLogout }: { user: any; onLogout: () => void }) {
                       {/* Task rows */}
                       {proj.expanded && proj.tasks.map((task:any)=>{
                         const pos=getPos(task.startDate,task.endDate);
-
                         const isDrag=dragging?.pid===proj.id && dragging?.tid===task.id;
                         return (
                           <div key={task.id} draggable
@@ -1072,7 +1044,6 @@ function GanttChart({ user, onLogout }: { user: any; onLogout: () => void }) {
                                 <div style={{flex:1,minWidth:0}}>
                                   <div style={{fontSize:14,color:'#1f2937',wordBreak:'break-word',lineHeight:1.4}}>{task.name}</div>
                                   {task.description && <div style={{fontSize:12,color:'#9ca3af',wordBreak:'break-word',marginTop:2}}>{task.description}</div>}
-
                                 </div>
                                 <div style={{display:'flex',gap:4,flexShrink:0,marginTop:2}}>
                                   <button onClick={()=>setEditingTask({task,pid:proj.id})} style={{padding:4,borderRadius:4,border:'none',background:'none',cursor:'pointer',fontSize:12}}>✏️</button>
@@ -1094,7 +1065,11 @@ function GanttChart({ user, onLogout }: { user: any; onLogout: () => void }) {
                                   onMouseLeave={()=>{if(!isDrag)setTooltip(null);}}>
                                   <div style={{position:'absolute',left:0,top:0,bottom:0,width:8,cursor:'ew-resize',zIndex:8,borderRadius:'5px 0 0 5px'}} onMouseDown={e=>handleMouseDown(e,proj.id,task.id,'start')} />
                                   <div style={{width:`${task.progress||0}%`,height:'100%',background:catColor?catColor.border:c.bar,borderRadius:4,pointerEvents:'none'}} />
-                                  {pos.width>40 ? <div style={{position:'absolute',inset:0,display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,fontWeight:700,pointerEvents:'none',color:'#fff',textShadow:'0 1px 3px rgba(0,0,0,0.5)'}}>{task.progress||0}%</div> : <div style={{position:'absolute',left:pos.width+5,top:'50%',transform:'translateY(-50%)',whiteSpace:'nowrap',fontSize:11,fontWeight:600,pointerEvents:'none',color:'#374151'}}>{task.progress||0}%</div>}
+                                  {/* ✅ 진행률 숫자 - 검은색 */}
+                                  {pos.width>40
+                                    ? <div style={{position:'absolute',inset:0,display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,fontWeight:700,pointerEvents:'none',color:'#1f2937'}}>{task.progress||0}%</div>
+                                    : <div style={{position:'absolute',left:pos.width+5,top:'50%',transform:'translateY(-50%)',whiteSpace:'nowrap',fontSize:11,fontWeight:600,pointerEvents:'none',color:'#374151'}}>{task.progress||0}%</div>
+                                  }
                                   <div style={{position:'absolute',right:0,top:0,bottom:0,width:8,cursor:'ew-resize',zIndex:8,borderRadius:'0 5px 5px 0'}} onMouseDown={e=>handleMouseDown(e,proj.id,task.id,'end')} />
                                 </div>
                               )}
@@ -1111,8 +1086,6 @@ function GanttChart({ user, onLogout }: { user: any; onLogout: () => void }) {
         </div>
       </div>
 
-
-
       {/* 툴팁 */}
       {tooltip?.startDate && (
         <div style={{position:'fixed',left:tooltipPos.x+12,top:tooltipPos.y+12,background:'#1f2937',color:'white',fontSize:11,padding:'6px 10px',borderRadius:6,whiteSpace:'nowrap',pointerEvents:'none',zIndex:99999,boxShadow:'0 2px 8px rgba(0,0,0,0.3)',lineHeight:1.6}}>
@@ -1123,7 +1096,6 @@ function GanttChart({ user, onLogout }: { user: any; onLogout: () => void }) {
 
       {editingProject && <ProjectEditModal proj={editingProject} onClose={()=>setEditingProject(null)} />}
       {editingTask && <TaskEditModal task={editingTask.task} pid={editingTask.pid} onClose={()=>setEditingTask(null)} />}
-      {/* ── 히스토리 모달 ── */}
       {showChangePw && <ChangePwModal />}
       {showHistory && <HistoryModal />}
     </div>
