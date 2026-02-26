@@ -6,10 +6,7 @@ const SUPABASE_URL = 'https://tcmcrpszpbawgwolzuno.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_ktL_xVzsDjv3wmbrO8j0Tg_DP2vYBHO';
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
-const CHART_START = new Date('2026-01-01T00:00:00');
-const CHART_END   = new Date('2026-12-31T00:00:00');
-const TOTAL_DAYS  = (CHART_END.getTime() - CHART_START.getTime()) / 86400000;
-const MONTHS = ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
+
 
 const calcCols = (w: number, numCols: number = 12) => {
   const leftCol     = Math.max(260, Math.floor(w * 0.30));
@@ -260,22 +257,15 @@ function GanttChart({ user, onLogout }: { user: any; onLogout: () => void }) {
   const rowDragRef     = useRef<any>(null);
   const historyTimer   = useRef<ReturnType<typeof setTimeout> | null>(null);
   const headerRef      = useRef<HTMLDivElement>(null);
-  const [headerHeight, setHeaderHeight] = useState(0);
   const HISTORY_DEBOUNCE_MS = 5 * 60 * 1000;
 
   useEffect(() => {
     const onResize = () => {
       setCols(calcCols(window.innerWidth, viewConfig.numCols));
-      if (headerRef.current) setHeaderHeight(headerRef.current.offsetHeight);
     };
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
   }, [viewConfig.numCols]);
-
-  // 헤더 높이 최초 측정
-  useEffect(() => {
-    if (headerRef.current) setHeaderHeight(headerRef.current.offsetHeight);
-  }, []);
 
   // viewMode 변경시 cols 재계산
   useEffect(() => {
