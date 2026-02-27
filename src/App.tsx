@@ -948,51 +948,51 @@ function GanttChart({ user, onLogout }: { user: any; onLogout: () => void }) {
 
         {/* 카테고리 + 그룹 필터 */}
         <div style={{display:'flex',gap:6,marginTop:12,alignItems:'center',flexWrap:'wrap'}}>
-          <span style={{fontSize:12,color:'rgba(255,255,255,0.6)',flexShrink:0,fontWeight:500}}>카테고리:</span>
+          <span style={{fontSize:12,color:'#e2e8f0',flexShrink:0,fontWeight:600}}>카테고리:</span>
           <button onClick={()=>setActiveCategories([])}
-            style={{padding:'5px 14px',borderRadius:20,fontSize:12,cursor:'pointer',fontWeight:activeCategories.length===0?600:400,border:activeCategories.length===0?'1.5px solid #818cf8':'1.5px solid rgba(255,255,255,0.15)',background:activeCategories.length===0?'rgba(99,102,241,0.25)':'rgba(255,255,255,0.05)',color:activeCategories.length===0?'#fff':'rgba(255,255,255,0.6)'}}>
-            전체 <span style={{marginLeft:2,fontSize:11,opacity:0.8}}>{projects.length}</span>
+            style={{padding:'5px 14px',borderRadius:20,fontSize:12,cursor:'pointer',fontWeight:activeCategories.length===0?600:400,border:activeCategories.length===0?'1.5px solid #818cf8':'1.5px solid rgba(255,255,255,0.4)',background:activeCategories.length===0?'rgba(99,102,241,0.35)':'rgba(255,255,255,0.12)',color:activeCategories.length===0?'#fff':'#e2e8f0'}}>
+            전체 <span style={{marginLeft:2,fontSize:11,opacity:0.9}}>{projects.length}</span>
           </button>
           {CATEGORIES.map(cat=>{
             const isActive=activeCategories.includes(cat);
             const cc=CATEGORY_COLORS[cat];
             return (
               <button key={cat} onClick={()=>setActiveCategories(prev=>prev.includes(cat)?prev.filter(c=>c!==cat):[...prev,cat])}
-                style={{padding:'5px 14px',borderRadius:20,fontSize:12,cursor:'pointer',fontWeight:isActive?600:400,border:isActive?`1.5px solid ${cc.border}`:'1.5px solid rgba(255,255,255,0.15)',background:isActive?`${cc.bg}22`:'rgba(255,255,255,0.05)',color:isActive?cc.border:'rgba(255,255,255,0.6)'}}>
-                {cat} <span style={{marginLeft:2,fontSize:11,opacity:0.8}}>{projects.filter(p=>p.category===cat).length}</span>
+                style={{padding:'5px 14px',borderRadius:20,fontSize:12,cursor:'pointer',fontWeight:isActive?600:400,border:isActive?`1.5px solid ${cc.border}`:'1.5px solid rgba(255,255,255,0.4)',background:isActive?`${cc.bg}33`:'rgba(255,255,255,0.12)',color:isActive?cc.border:'#e2e8f0'}}>
+                {cat} <span style={{marginLeft:2,fontSize:11,opacity:0.9}}>{projects.filter(p=>p.category===cat).length}</span>
               </button>
             );
           })}
-          {activeCategories.length>0 && <button onClick={()=>setActiveCategories([])} style={{fontSize:11,color:'rgba(255,255,255,0.4)',background:'none',border:'none',cursor:'pointer',textDecoration:'underline'}}>초기화</button>}
+          {activeCategories.length>0 && <button onClick={()=>setActiveCategories([])} style={{fontSize:11,color:'#94a3b8',background:'none',border:'none',cursor:'pointer',textDecoration:'underline'}}>초기화</button>}
           {allGroups.length > 0 && <>
-            <div style={{width:1,height:16,background:'rgba(255,255,255,0.15)',flexShrink:0,marginLeft:4}} />
-            <span style={{fontSize:12,color:'rgba(255,255,255,0.6)',flexShrink:0,fontWeight:500}}>그룹:</span>
+            <div style={{width:1,height:16,background:'rgba(255,255,255,0.3)',flexShrink:0,marginLeft:4}} />
+            <span style={{fontSize:12,color:'#e2e8f0',flexShrink:0,fontWeight:600}}>그룹:</span>
             <button onClick={()=>setActiveGroup('')}
-              style={{padding:'5px 14px',borderRadius:20,fontSize:12,cursor:'pointer',fontWeight:activeGroup===''?600:400,border:activeGroup===''?'1.5px solid #818cf8':'1.5px solid rgba(255,255,255,0.15)',background:activeGroup===''?'rgba(99,102,241,0.25)':'rgba(255,255,255,0.05)',color:activeGroup===''?'#fff':'rgba(255,255,255,0.6)'}}>
+              style={{padding:'5px 14px',borderRadius:20,fontSize:12,cursor:'pointer',fontWeight:activeGroup===''?600:400,border:activeGroup===''?'1.5px solid #818cf8':'1.5px solid rgba(255,255,255,0.4)',background:activeGroup===''?'rgba(99,102,241,0.35)':'rgba(255,255,255,0.12)',color:activeGroup===''?'#fff':'#e2e8f0'}}>
               전체
             </button>
             {allGroups.map(g=>(
               <button key={g} onClick={()=>setActiveGroup(prev=>prev===g?'':g)}
-                style={{padding:'5px 14px',borderRadius:20,fontSize:12,cursor:'pointer',fontWeight:activeGroup===g?600:400,border:activeGroup===g?'1.5px solid #818cf8':'1.5px solid rgba(255,255,255,0.15)',background:activeGroup===g?'rgba(99,102,241,0.25)':'rgba(255,255,255,0.05)',color:activeGroup===g?'#fff':'rgba(255,255,255,0.6)'}}>
-                {g} <span style={{fontSize:11,opacity:0.8}}>{projects.filter(p=>(p.group||'미분류')===g).length}</span>
+                style={{padding:'5px 14px',borderRadius:20,fontSize:12,cursor:'pointer',fontWeight:activeGroup===g?600:400,border:activeGroup===g?'1.5px solid #818cf8':'1.5px solid rgba(255,255,255,0.4)',background:activeGroup===g?'rgba(99,102,241,0.35)':'rgba(255,255,255,0.12)',color:activeGroup===g?'#fff':'#e2e8f0'}}>
+                {g} <span style={{fontSize:11,opacity:0.9}}>{projects.filter(p=>(p.group||'미분류')===g).length}</span>
               </button>
             ))}
           </>}
         </div>
 
         {/* Legend */}
-        <div style={{display:'flex',alignItems:'center',gap:16,marginTop:10,flexWrap:'wrap',paddingTop:10,borderTop:'1px solid rgba(255,255,255,0.07)'}}>
+        <div style={{display:'flex',alignItems:'center',gap:16,marginTop:10,flexWrap:'wrap',paddingTop:10,borderTop:'1px solid rgba(255,255,255,0.15)'}}>
           <div style={{display:'flex',alignItems:'center',gap:5,flexShrink:0}}>
             {(['영업','기획','운영','개발','보안'] as string[]).map(cat=>{
               const cc = ({'영업':{bg:'#fef3c7',text:'#92400e',border:'#f59e0b'},'기획':{bg:'#fce7f3',text:'#9d174d',border:'#ec4899'},'운영':{bg:'#e0f2fe',text:'#075985',border:'#0ea5e9'},'개발':{bg:'#d1fae5',text:'#065f46',border:'#10b981'},'보안':{bg:'#fee2e2',text:'#991b1b',border:'#ef4444'}} as any)[cat];
-              return <span key={cat} style={{fontSize:10,padding:'2px 8px',borderRadius:10,background:cc.bg,color:cc.text,border:`1px solid ${cc.border}`,fontWeight:600,whiteSpace:'nowrap'}}>{cat}</span>;
+              return <span key={cat} style={{fontSize:11,padding:'2px 8px',borderRadius:10,background:cc.bg,color:cc.text,border:`1px solid ${cc.border}`,fontWeight:600,whiteSpace:'nowrap'}}>{cat}</span>;
             })}
           </div>
-          <div style={{width:1,height:14,background:'rgba(255,255,255,0.1)',flexShrink:0}} />
+          <div style={{width:1,height:14,background:'rgba(255,255,255,0.3)',flexShrink:0}} />
           <div style={{display:'flex',alignItems:'center',gap:12,flexWrap:'wrap'}}>
-            <div style={{display:'flex',alignItems:'center',gap:5}}><div style={{width:10,height:10,borderRadius:'50%',background:'#f87171'}} /><span style={{fontSize:12,color:'rgba(255,255,255,0.6)'}}>오늘</span></div>
-            <div style={{display:'flex',alignItems:'center',gap:5}}><div style={{width:28,height:9,borderRadius:3,background:'linear-gradient(to right,#3b82f6 50%,#bfdbfe 50%)'}} /><span style={{fontSize:12,color:'rgba(255,255,255,0.6)'}}>진행률</span></div>
-            <span style={{fontSize:12,color:'rgba(255,255,255,0.3)'}}>⠿ 드래그로 순서 변경 | 바 드래그로 일정 조정 | 그룹명 더블클릭 이름 변경</span>
+            <div style={{display:'flex',alignItems:'center',gap:5}}><div style={{width:10,height:10,borderRadius:'50%',background:'#f87171'}} /><span style={{fontSize:12,color:'#e2e8f0'}}>오늘</span></div>
+            <div style={{display:'flex',alignItems:'center',gap:5}}><div style={{width:28,height:9,borderRadius:3,background:'linear-gradient(to right,#3b82f6 50%,#bfdbfe 50%)'}} /><span style={{fontSize:12,color:'#e2e8f0'}}>진행률</span></div>
+            <span style={{fontSize:12,color:'#94a3b8'}}>⠿ 드래그로 순서 변경 | 바 드래그로 일정 조정 | 그룹명 더블클릭 이름 변경</span>
           </div>
         </div>
       </div>
@@ -1047,11 +1047,11 @@ function GanttChart({ user, onLogout }: { user: any; onLogout: () => void }) {
                     ) : (
                       <span onDoubleClick={()=>{setEditingGroupName(group.name);setEditingGroupValue(group.name);}}
                         title="더블클릭하여 이름 변경"
-                        style={{fontSize:13,fontWeight:700,color:'#374151',cursor:'text'}}>
+                        style={{fontSize:16,fontWeight:800,color:'#1e293b',cursor:'text'}}>
                         {group.name}
                       </span>
                     )}
-                    <span style={{fontSize:11,color:'#9ca3af',marginLeft:4}}>({group.items.length}개 프로젝트)</span>
+                    <span style={{fontSize:12,color:'#9ca3af',marginLeft:4}}>({group.items.length}개 프로젝트)</span>
                   </div>
                   <div style={{width:ASSIGNEE_COL,minWidth:ASSIGNEE_COL,flexShrink:0,borderRight:'1px solid #e5e7eb',position:'sticky',left:LEFT_COL,zIndex:8,background:'inherit'}} />
                   <div style={{width:SUB_COL,minWidth:SUB_COL,flexShrink:0,borderRight:'1px solid #e5e7eb',position:'sticky',left:LEFT_COL+ASSIGNEE_COL,zIndex:8,background:'inherit'}} />
@@ -1116,10 +1116,10 @@ function GanttChart({ user, onLogout }: { user: any; onLogout: () => void }) {
                           <div style={{width:4,borderRadius:2,flexShrink:0,alignSelf:'stretch',background:c.border}} />
                           <div style={{flex:1,minWidth:0,padding:'4px 0'}}>
                             <div style={{display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
-                              {catColor && <span style={{fontSize:11,padding:'2px 8px',borderRadius:10,background:catColor.bg,color:catColor.text,border:`1px solid ${catColor.border}`,fontWeight:600,flexShrink:0,whiteSpace:'nowrap'}}>{proj.category}</span>}
-                              <span style={{fontWeight:'bold',fontSize:14,color:c.text,wordBreak:'break-word',lineHeight:1.4}}>{proj.name}</span>
+                              {catColor && <span style={{fontSize:12,padding:'2px 8px',borderRadius:10,background:catColor.bg,color:catColor.text,border:`1px solid ${catColor.border}`,fontWeight:600,flexShrink:0,whiteSpace:'nowrap'}}>{proj.category}</span>}
+                              <span style={{fontWeight:700,fontSize:15,color:c.text,wordBreak:'break-word',lineHeight:1.4}}>{proj.name}</span>
                             </div>
-                            {proj.description && <div style={{fontSize:12,color:c.text,opacity:0.7,wordBreak:'break-word',marginTop:2}}>{proj.description}</div>}
+                            {proj.description && <div style={{fontSize:13,color:c.text,opacity:0.85,wordBreak:'break-word',marginTop:2}}>{proj.description}</div>}
                           </div>
                           <div style={{display:'flex',gap:4,flexShrink:0,marginTop:4}}>
                             <button onClick={()=>setEditingProject(proj)} style={{padding:4,borderRadius:4,border:'none',background:'none',cursor:'pointer',fontSize:12}}>✏️</button>
@@ -1221,10 +1221,10 @@ function GanttChart({ user, onLogout }: { user: any; onLogout: () => void }) {
                                 <span style={{fontSize:14,color:'#d1d5db',cursor:'grab',userSelect:'none',flexShrink:0,marginTop:1}} title="드래그하여 순서 변경">⠿</span>
                                 <div style={{flex:1,minWidth:0}}>
                                   <div style={{display:'flex',alignItems:'center',gap:5,flexWrap:'wrap',marginBottom:2}}>
-                                    {task.category && CATEGORY_COLORS[task.category] && (()=>{const cc=CATEGORY_COLORS[task.category];return <span style={{fontSize:10,padding:'1px 7px',borderRadius:8,background:cc.bg,color:cc.text,border:`1px solid ${cc.border}`,fontWeight:600,flexShrink:0,whiteSpace:'nowrap'}}>{task.category}</span>;})()}
+                                    {task.category && CATEGORY_COLORS[task.category] && (()=>{const cc=CATEGORY_COLORS[task.category];return <span style={{fontSize:11,padding:'1px 7px',borderRadius:8,background:cc.bg,color:cc.text,border:`1px solid ${cc.border}`,fontWeight:600,flexShrink:0,whiteSpace:'nowrap'}}>{task.category}</span>;})()}
                                     <span style={{fontSize:14,color:'#1f2937',wordBreak:'break-word',lineHeight:1.4}}>{task.name}</span>
                                   </div>
-                                  {task.description && <div style={{fontSize:12,color:'#9ca3af',wordBreak:'break-word'}}>{task.description}</div>}
+                                  {task.description && <div style={{fontSize:13,color:'#6b7280',wordBreak:'break-word'}}>{task.description}</div>}
                                 </div>
                                 <div style={{display:'flex',gap:4,flexShrink:0,marginTop:2}}>
                                   <button onClick={()=>setEditingTask({task,pid:proj.id})} style={{padding:4,borderRadius:4,border:'none',background:'none',cursor:'pointer',fontSize:12}}>✏️</button>
