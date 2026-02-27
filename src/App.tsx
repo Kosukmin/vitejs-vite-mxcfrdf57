@@ -454,6 +454,7 @@ function GanttChart({ user, onLogout }: { user: any; onLogout: () => void }) {
       const task = projects.find(p=>p.id===pid)?.tasks.find((t:any)=>t.id===tid); if (!task) return;
       dragRef.current = { pid, tid, type, startX:e.clientX, startDate:task.startDate, endDate:task.endDate };
     }
+    isSavingRef.current = true; // 드래그 시작 시 내 액션으로 표시
     setDragging({ pid, tid, type });
   };
 
@@ -477,7 +478,13 @@ function GanttChart({ user, onLogout }: { user: any; onLogout: () => void }) {
       if (d.tid==='__proj__') { updateProject(d.pid,{startDate:toDateStr(ns),endDate:toDateStr(ne)}); setTooltip((t:any)=>t?{...t,startDate:toDateStr(ns),endDate:toDateStr(ne)}:t); }
       else                    { updateTask(d.pid,d.tid,{startDate:toDateStr(ns),endDate:toDateStr(ne)}); setTooltip((t:any)=>t?{...t,startDate:toDateStr(ns),endDate:toDateStr(ne)}:t); }
     };
-    const onUp = () => { dragRef.current=null; setDragging(null); document.body.style.cursor=''; document.body.style.userSelect=''; };
+    const onUp = () => {
+      dragRef.current=null;
+      setDragging(null);
+      document.body.style.cursor='';
+      document.body.style.userSelect='';
+      setTimeout(() => { isSavingRef.current = false; }, 1500); // 드래그 끝나고 save 완료될 때까지 여유
+    };
     document.body.style.userSelect='none';
     document.body.style.cursor=dragging.type==='move'?'grabbing':'ew-resize';
     window.addEventListener('mousemove', onMove, {passive:false});
