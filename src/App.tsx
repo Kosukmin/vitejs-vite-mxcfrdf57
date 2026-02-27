@@ -255,7 +255,8 @@ function GanttChart({ user, onLogout }: { user: any; onLogout: () => void }) {
   const rowDragRef     = useRef<any>(null);
   const historyTimer   = useRef<ReturnType<typeof setTimeout> | null>(null);
   const headerRef      = useRef<HTMLDivElement>(null);
-  const draggingRef    = useRef<any>(null); // dragging 상태의 ref 버전 (Realtime 콜백에서 참조)
+  const draggingRef    = useRef<any>(null);
+  const isSavingRef    = useRef<boolean>(false); // 내가 저장 중일 때 Realtime 토스트 무시
   const toastTimer     = useRef<ReturnType<typeof setTimeout> | null>(null);
   const HISTORY_DEBOUNCE_MS = 5 * 60 * 1000;
 
@@ -311,8 +312,8 @@ function GanttChart({ user, onLogout }: { user: any; onLogout: () => void }) {
         'postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'gantt_projects', filter: 'id=eq.1' },
         (payload: any) => {
-          // 내가 드래그 중이면 덮어쓰기 방지
-          if (draggingRef.current) return;
+          // 내가 저장 중이거나 드래그 중이면 무시
+          if (isSavingRef.current || draggingRef.current) return;
           setProjects(payload.new.data || []);
           // 토스트 알림 표시
           if (toastTimer.current) clearTimeout(toastTimer.current);
@@ -347,10 +348,14 @@ function GanttChart({ user, onLogout }: { user: any; onLogout: () => void }) {
   const save = async (p: any[], memo?: string) => {
     setProjects(p);
     setSaving(true);
+    isSavingRef.current = true;
     try {
       await supabase.from('gantt_projects').upsert({ id: 1, data: p });
     } catch {}
-    finally { setSaving(false); }
+    finally {
+      setSaving(false);
+      setTimeout(() => { isSavingRef.current = false; }, 1000); // 1초 여유
+    }
 
     if (historyTimer.current) clearTimeout(historyTimer.current);
     historyTimer.current = setTimeout(() => {
@@ -881,12 +886,7 @@ function GanttChart({ user, onLogout }: { user: any; onLogout: () => void }) {
         *{box-sizing:border-box; font-family:'Pretendard',-apple-system,BlinkMacSystemFont,sans-serif;}
       `}</style>
 
-      {/* Realtime 수신 토스트 */}
-      {realtimeToast && (
-        <div style={{position:'fixed',top:16,left:'50%',transform:'translateX(-50%)',zIndex:99999,background:'#1e293b',color:'#4ade80',padding:'8px 18px',borderRadius:20,fontSize:13,fontWeight:600,boxShadow:'0 4px 16px rgba(0,0,0,0.3)',border:'1px solid rgba(74,222,128,0.3)',display:'flex',alignItems:'center',gap:7,animation:'fadeInDown 0.3s ease',pointerEvents:'none'}}>
-          <span style={{fontSize:15}}>🔄</span> 다른 팀원이 업데이트했습니다
-        </div>
-      )}
+      {/* Realtime 수신 토스트 - 헤더에서 인라인으로 표시 */}
 
       {/* Header */}
       <div ref={headerRef} style={{background:'linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 60%, #16213e 100%)',borderBottom:'1px solid rgba(255,255,255,0.08)',padding:'16px 24px',flexShrink:0,boxShadow:'0 2px 16px rgba(0,0,0,0.4)',position:'sticky',top:0,zIndex:30}}>
@@ -895,7 +895,14 @@ function GanttChart({ user, onLogout }: { user: any; onLogout: () => void }) {
             <div style={{width:36,height:36,borderRadius:10,background:'linear-gradient(135deg,#6366f1,#a855f7)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:18,boxShadow:'0 2px 8px rgba(99,102,241,0.4)'}}>📊</div>
             <div>
               <h1 style={{fontSize:18,fontWeight:'bold',color:'#f1f5f9',margin:0,letterSpacing:'-0.3px'}}>샌디버스 간트차트</h1>
-              <p style={{fontSize:11,color:'rgba(148,163,184,0.8)',margin:'2px 0 0'}}>2026년 · Supabase 연동 · 실시간 동기화 🟢</p>
+              <div style={{display:'flex',alignItems:'center',gap:8,marginTop:2}}>
+                <p style={{fontSize:11,color:'rgba(148,163,184,0.8)',margin:0}}>2026년 · Supabase 연동 · 실시간 동기화 🟢</p>
+                {realtimeToast && (
+                  <span style={{fontSize:11,color:'#4ade80',background:'rgba(74,222,128,0.12)',padding:'2px 8px',borderRadius:10,border:'1px solid rgba(74,222,128,0.25)',fontWeight:600,animation:'fadeInDown 0.3s ease',display:'flex',alignItems:'center',gap:4}}>
+                    🔄 다른 팀원이 업데이트했습니다
+                  </span>
+                )}
+              </div>
             </div>
           </div>
           <div style={{display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
@@ -1119,7 +1126,7 @@ function GanttChart({ user, onLogout }: { user: any; onLogout: () => void }) {
                               {catColor && <span style={{fontSize:12,padding:'2px 8px',borderRadius:10,background:catColor.bg,color:catColor.text,border:`1px solid ${catColor.border}`,fontWeight:600,flexShrink:0,whiteSpace:'nowrap'}}>{proj.category}</span>}
                               <span style={{fontWeight:700,fontSize:15,color:c.text,wordBreak:'break-word',lineHeight:1.4}}>{proj.name}</span>
                             </div>
-                            {proj.description && <div style={{fontSize:13,color:c.text,opacity:0.85,wordBreak:'break-word',marginTop:2}}>{proj.description}</div>}
+                            {proj.description && <div style={{fontSize:13,color:c.text,opacity:0.85,wordBreak:'break-word',marginTop:2,lineHeight:1.3}}>{proj.description}</div>}
                           </div>
                           <div style={{display:'flex',gap:4,flexShrink:0,marginTop:4}}>
                             <button onClick={()=>setEditingProject(proj)} style={{padding:4,borderRadius:4,border:'none',background:'none',cursor:'pointer',fontSize:12}}>✏️</button>
@@ -1185,18 +1192,26 @@ function GanttChart({ user, onLogout }: { user: any; onLogout: () => void }) {
                               const barBg = taskCatColor ? taskCatColor.border : tc.bar;
                               const barBgLight = taskCatColor ? taskCatColor.bg : tc.barLight;
                               const topOffset = (containerH - totalH) / 2 + lane * (ROW_H + GAP);
+                              const isDrag = dragging?.pid===proj.id && dragging?.tid===task.id;
                               return (
                                 <div key={task.id}
                                   onMouseEnter={e=>{setTooltip({startDate:task.startDate,endDate:task.endDate,name:task.name});setTooltipPos({x:e.clientX,y:e.clientY});}}
                                   onMouseMove={e=>setTooltipPos({x:e.clientX,y:e.clientY})}
-                                  onMouseLeave={()=>setTooltip(null)}
-                                  style={{position:'absolute',left:tpos.left,width:tpos.width,height:ROW_H,top:topOffset,background:barBgLight,borderRadius:3,zIndex:6,cursor:'default',display:'flex',alignItems:'center',overflow:'hidden',minWidth:4,border:`1px solid ${barBg}55`,boxShadow:`0 1px 3px ${barBg}33`}}>
-                                  <div style={{width:`${task.progress||0}%`,height:'100%',background:barBg,borderRadius:3,opacity:0.7}} />
+                                  onMouseLeave={()=>{if(!isDrag)setTooltip(null);}}
+                                  onMouseDown={e=>handleMouseDown(e,proj.id,task.id,'move')}
+                                  style={{position:'absolute',left:tpos.left,width:tpos.width,height:ROW_H,top:topOffset,background:barBgLight,borderRadius:3,zIndex:6,cursor:'grab',display:'flex',alignItems:'center',overflow:'visible',minWidth:4,border:`1px solid ${barBg}55`,boxShadow:`0 1px 3px ${barBg}33`}}>
+                                  {/* 왼쪽 리사이즈 핸들 */}
+                                  <div onMouseDown={e=>handleMouseDown(e,proj.id,task.id,'start')}
+                                    style={{position:'absolute',left:0,top:0,bottom:0,width:6,cursor:'ew-resize',zIndex:8,borderRadius:'3px 0 0 3px'}} />
+                                  <div style={{width:`${task.progress||0}%`,height:'100%',background:barBg,borderRadius:3,opacity:0.7,pointerEvents:'none'}} />
                                   {tpos.width > 36 && (
-                                    <span style={{position:'absolute',left:4,right:4,fontSize:10,color:'#1f2937',fontWeight:600,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',lineHeight:1,pointerEvents:'none'}}>
+                                    <span style={{position:'absolute',left:8,right:8,fontSize:10,color:'#1f2937',fontWeight:600,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',lineHeight:1,pointerEvents:'none'}}>
                                       {task.name}
                                     </span>
                                   )}
+                                  {/* 오른쪽 리사이즈 핸들 */}
+                                  <div onMouseDown={e=>handleMouseDown(e,proj.id,task.id,'end')}
+                                    style={{position:'absolute',right:0,top:0,bottom:0,width:6,cursor:'ew-resize',zIndex:8,borderRadius:'0 3px 3px 0'}} />
                                 </div>
                               );
                             });
