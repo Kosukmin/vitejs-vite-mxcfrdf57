@@ -248,12 +248,19 @@ function GanttChart({ user, onLogout }: { user: any; onLogout: () => void }) {
   const [rowDrag, setRowDrag]                 = useState<any>(null);
   const [rowDragOver, setRowDragOver]         = useState<any>(null);
   const [groupOrder, setGroupOrder]           = useState<string[]>([]);
+  // ── Realtime 수신 알림 표시용 ──
+  const [realtimeToast, setRealtimeToast]     = useState(false);
 
   const dragRef        = useRef<any>(null);
   const rowDragRef     = useRef<any>(null);
   const historyTimer   = useRef<ReturnType<typeof setTimeout> | null>(null);
   const headerRef      = useRef<HTMLDivElement>(null);
+  const draggingRef    = useRef<any>(null); // dragging 상태의 ref 버전 (Realtime 콜백에서 참조)
+  const toastTimer     = useRef<ReturnType<typeof setTimeout> | null>(null);
   const HISTORY_DEBOUNCE_MS = 5 * 60 * 1000;
+
+  // dragging state 변경 시 ref도 동기화
+  useEffect(() => { draggingRef.current = dragging; }, [dragging]);
 
   useEffect(() => {
     const onResize = () => {
@@ -294,7 +301,33 @@ function GanttChart({ user, onLogout }: { user: any; onLogout: () => void }) {
     return result;
   };
 
-  useEffect(() => { load(); }, []);
+  // ── 최초 로드 + Realtime 구독 ──────────────────────────
+  useEffect(() => {
+    load();
+
+    const channel = supabase
+      .channel('gantt-bus-sync')
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'gantt_projects', filter: 'id=eq.1' },
+        (payload: any) => {
+          // 내가 드래그 중이면 덮어쓰기 방지
+          if (draggingRef.current) return;
+          setProjects(payload.new.data || []);
+          // 토스트 알림 표시
+          if (toastTimer.current) clearTimeout(toastTimer.current);
+          setRealtimeToast(true);
+          toastTimer.current = setTimeout(() => setRealtimeToast(false), 2500);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+      if (toastTimer.current) clearTimeout(toastTimer.current);
+    };
+  }, []);
+  // ──────────────────────────────────────────────────────
 
   const load = async () => {
     setLoading(true);
@@ -844,8 +877,16 @@ function GanttChart({ user, onLogout }: { user: any; onLogout: () => void }) {
       <style>{`
         @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
         @keyframes spin{to{transform:rotate(360deg)}}
+        @keyframes fadeInDown{from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:translateY(0)}}
         *{box-sizing:border-box; font-family:'Pretendard',-apple-system,BlinkMacSystemFont,sans-serif;}
       `}</style>
+
+      {/* Realtime 수신 토스트 */}
+      {realtimeToast && (
+        <div style={{position:'fixed',top:16,left:'50%',transform:'translateX(-50%)',zIndex:99999,background:'#1e293b',color:'#4ade80',padding:'8px 18px',borderRadius:20,fontSize:13,fontWeight:600,boxShadow:'0 4px 16px rgba(0,0,0,0.3)',border:'1px solid rgba(74,222,128,0.3)',display:'flex',alignItems:'center',gap:7,animation:'fadeInDown 0.3s ease',pointerEvents:'none'}}>
+          <span style={{fontSize:15}}>🔄</span> 다른 팀원이 업데이트했습니다
+        </div>
+      )}
 
       {/* Header */}
       <div ref={headerRef} style={{background:'linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 60%, #16213e 100%)',borderBottom:'1px solid rgba(255,255,255,0.08)',padding:'16px 24px',flexShrink:0,boxShadow:'0 2px 16px rgba(0,0,0,0.4)',position:'sticky',top:0,zIndex:30}}>
@@ -854,7 +895,7 @@ function GanttChart({ user, onLogout }: { user: any; onLogout: () => void }) {
             <div style={{width:36,height:36,borderRadius:10,background:'linear-gradient(135deg,#6366f1,#a855f7)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:18,boxShadow:'0 2px 8px rgba(99,102,241,0.4)'}}>📊</div>
             <div>
               <h1 style={{fontSize:18,fontWeight:'bold',color:'#f1f5f9',margin:0,letterSpacing:'-0.3px'}}>샌디버스 간트차트</h1>
-              <p style={{fontSize:11,color:'rgba(148,163,184,0.8)',margin:'2px 0 0'}}>2026년 · Supabase 연동</p>
+              <p style={{fontSize:11,color:'rgba(148,163,184,0.8)',margin:'2px 0 0'}}>2026년 · Supabase 연동 · 실시간 동기화 🟢</p>
             </div>
           </div>
           <div style={{display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
@@ -876,7 +917,6 @@ function GanttChart({ user, onLogout }: { user: any; onLogout: () => void }) {
               style={{display:'flex',alignItems:'center',gap:5,height:30,padding:'0 11px',background:'rgba(22,163,74,0.85)',color:'white',border:'1px solid rgba(74,222,128,0.2)',borderRadius:7,cursor:'pointer',fontSize:12,fontWeight:500,boxShadow:'0 1px 4px rgba(22,163,74,0.25)'}}>
               ⬇ CSV
             </button>
-            {/* 뷰 전환 버튼 */}
             <div style={{display:'flex',alignItems:'center',background:'rgba(255,255,255,0.07)',borderRadius:8,border:'1px solid rgba(255,255,255,0.12)',padding:2,gap:2}}>
               {([['half','6개월'] as const,['year','12개월'] as const]).map(([mode,label])=>(
                 <button key={mode} onClick={()=>setViewMode(mode)}
