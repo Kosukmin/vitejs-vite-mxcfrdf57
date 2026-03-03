@@ -8,15 +8,62 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 
 
-const calcCols = (w: number, numCols: number = 12) => {
-  const leftCol     = Math.max(260, Math.floor(w * 0.30));
-  const assigneeCol = Math.max(56,  Math.floor(w * 0.06));  // 정
-  const subCol      = Math.max(56,  Math.floor(w * 0.06));  // 부
-  const timelineTotal = w - leftCol - assigneeCol - subCol;
-  const monthCol    = Math.floor(timelineTotal / numCols);
-  const timelineW   = monthCol * 12;
-  return { leftCol, assigneeCol, subCol, monthCol, timelineW };
+// ── 줌 레벨별 레이아웃 계산 ──────────────────────────────
+type ViewMode = 'year'|'half'|'week'|'day';
+
+const WEEK_COL_W = 52;
+const DAY_COL_W  = 28;
+
+const calcLayout = (mode: ViewMode, screenW: number) => {
+  const leftCol     = Math.max(260, Math.floor(screenW * 0.30));
+  const assigneeCol = Math.max(56,  Math.floor(screenW * 0.06));
+  const subCol      = Math.max(56,  Math.floor(screenW * 0.06));
+  const availW      = screenW - leftCol - assigneeCol - subCol;
+
+  let colW: number, totalTimelineW: number;
+  if (mode === 'year') {
+    colW = Math.floor(availW / 12);
+    totalTimelineW = colW * 12;
+  } else if (mode === 'half') {
+    colW = Math.floor(availW / 6);
+    totalTimelineW = colW * 12;
+  } else if (mode === 'week') {
+    colW = WEEK_COL_W;
+    totalTimelineW = WEEK_COL_W * 52;
+  } else {
+    colW = DAY_COL_W;
+    totalTimelineW = DAY_COL_W * 365;
+  }
+  return { leftCol, assigneeCol, subCol, colW, totalTimelineW };
 };
+
+const MONTH_LABELS = ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
+
+const WEEK_HEADERS = (() => {
+  const items: { label: string; isFirstOfMonth: boolean; month: number; weekInMonth: number }[] = [];
+  const base = new Date('2026-01-01T00:00:00');
+  let currentMonth = -1;
+  let weekInMonth = 0;
+  for (let w = 0; w < 52; w++) {
+    const d = new Date(base); d.setDate(d.getDate() + w * 7);
+    const month = d.getMonth() + 1;
+    const isFirstOfMonth = month !== currentMonth;
+    if (isFirstOfMonth) { currentMonth = month; weekInMonth = 1; }
+    else { weekInMonth++; }
+    items.push({ label: `W${weekInMonth}`, isFirstOfMonth, month, weekInMonth });
+  }
+  return items;
+})();
+
+const DAY_HEADERS = (() => {
+  const items: { day: number; month: number; isFirst: boolean }[] = [];
+  const base = new Date('2026-01-01T00:00:00');
+  for (let i = 0; i < 365; i++) {
+    const d = new Date(base); d.setDate(d.getDate() + i);
+    items.push({ day: d.getDate(), month: d.getMonth()+1, isFirst: d.getDate()===1 });
+  }
+  return items;
+})();
 
 const COLOR_MAP: Record<string, any> = {
   blue:   { bar:'#3b82f6', barLight:'#bfdbfe', text:'#1e40af', border:'#3b82f6', rowBg:'#f8faff' },
@@ -35,7 +82,12 @@ const CATEGORY_COLORS: Record<string, any> = {
 };
 const CATEGORIES = ['영업','기획','운영','개발','보안'];
 
-const toDateStr = (d: Date) => d.toISOString().split('T')[0];
+const toDateStr = (d: Date) => {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+};
 const parseDate = (s: string) => new Date(s + 'T00:00:00');
 const todayStr = () => toDateStr(new Date());
 const weekLaterStr = () => { const d = new Date(); d.setDate(d.getDate() + 7); return toDateStr(d); };
@@ -62,13 +114,15 @@ function LoginScreen({ onLogin }: { onLogin: (user: any) => void }) {
     <div style={{minHeight:'100vh',background:'linear-gradient(135deg,#0f0f1a 0%,#1a1a2e 60%,#16213e 100%)',display:'flex',alignItems:'center',justifyContent:'center',fontFamily:"'Pretendard',-apple-system,BlinkMacSystemFont,sans-serif"}}>
       <style>{`@import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css'); @keyframes spin{to{transform:rotate(360deg)}} *{box-sizing:border-box;}`}</style>
       <div style={{width:'100%',maxWidth:400,padding:'0 24px'}}>
-        {/* 로고 */}
         <div style={{textAlign:'center',marginBottom:40}}>
-          <div style={{width:56,height:56,borderRadius:16,background:'linear-gradient(135deg,#6366f1,#a855f7)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:28,margin:'0 auto 16px',boxShadow:'0 4px 20px rgba(99,102,241,0.4)'}}>📊</div>
-          <h1 style={{fontSize:22,fontWeight:'bold',color:'#f1f5f9',margin:'0 0 6px',letterSpacing:'-0.5px'}}>샌디버스 간트차트</h1>
-          <p style={{fontSize:13,color:'rgba(148,163,184,0.6)',margin:0}}>팀원만 접근 가능한 프로젝트 관리 도구</p>
+          <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:16,marginBottom:14}}>
+            <div style={{width:52,height:52,borderRadius:14,background:'linear-gradient(135deg,#6366f1,#8b5cf6)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:26,boxShadow:'0 4px 18px rgba(99,102,241,0.45)'}}>📱</div>
+            <div style={{width:2,height:40,background:'rgba(255,255,255,0.12)',borderRadius:2}} />
+            <div style={{width:52,height:52,borderRadius:14,background:'linear-gradient(135deg,#0ea5e9,#6366f1)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:26,boxShadow:'0 4px 18px rgba(14,165,233,0.4)'}}>🚌</div>
+          </div>
+          <h1 style={{fontSize:36,fontWeight:'bold',color:'#f1f5f9',margin:'0 0 10px',letterSpacing:'-1px'}}>간트차트</h1>
+          <p style={{fontSize:16,color:'rgba(148,163,184,0.8)',margin:0,fontWeight:500}}>팀원만 접근 가능한 프로젝트 관리 도구</p>
         </div>
-        {/* 로그인 카드 */}
         <div style={{background:'rgba(255,255,255,0.05)',borderRadius:16,padding:32,border:'1px solid rgba(255,255,255,0.1)',backdropFilter:'blur(10px)'}}>
           <div style={{marginBottom:18}}>
             <label style={{display:'block',fontSize:13,color:'rgba(148,163,184,0.8)',marginBottom:7,fontWeight:500}}>이메일</label>
@@ -101,10 +155,13 @@ function LoginScreen({ onLogin }: { onLogin: (user: any) => void }) {
     </div>
   );
 }
-// ────────────────────────────────────────────────────
 
 export default function App() {
   const [user, setUser] = useState<any>(null);
+  const [appId, setAppId] = useState<1|2>(() => {
+    const saved = localStorage.getItem('gantt_last_app');
+    return (saved === '1' ? 1 : 2) as 1|2;
+  });
   const [authLoading, setAuthLoading] = useState(true);
   const [isResetMode, setIsResetMode] = useState(false);
 
@@ -139,10 +196,9 @@ export default function App() {
 
   if (!user) return <LoginScreen onLogin={setUser} />;
 
-  return <GanttChart user={user} onLogout={async () => { await supabase.auth.signOut(); setUser(null); }} />;
+  return <GanttChart user={user} appId={appId} onAppChange={(id) => { setAppId(id); localStorage.setItem('gantt_last_app', String(id)); }} onLogout={async () => { await supabase.auth.signOut(); setUser(null); }} />;
 }
 
-// ── 비밀번호 재설정 화면 ──────────
 function ResetPasswordScreen({ user, onDone }: { user: any; onDone: () => void }) {
   const [newPw, setNewPw]         = useState('');
   const [confirmPw, setConfirmPw] = useState('');
@@ -205,25 +261,43 @@ function ResetPasswordScreen({ user, onDone }: { user: any; onDone: () => void }
     </div>
   );
 }
-// ────────────────────────────────────────────────────
 
-function GanttChart({ user, onLogout }: { user: any; onLogout: () => void }) {
-  const [viewMode, setViewMode] = useState<'half'|'year'>('year');
+function GanttChart({ user, appId, onAppChange, onLogout }: { user: any; appId: 1|2; onAppChange: (id: 1|2) => void; onLogout: () => void }) {
+  const APP_CONFIG = {
+    1: { name: '샌디버스 간트차트', channel: 'gantt-bus-sync', csvPrefix: '샌디버스' },
+    2: { name: '샌디앱 간트차트',   channel: 'gantt-app-sync', csvPrefix: '샌디앱'   },
+  };
+  const currentApp = APP_CONFIG[appId];
 
-  const viewConfig = (() => {
-    const allMonths = ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
-    const start = new Date('2026-01-01T00:00:00');
-    const end   = new Date('2026-12-31T00:00:00');
-    const numCols = viewMode === 'half' ? 6 : 12;
-    return { start, end, months: allMonths, numCols };
-  })();
-  const V_START = viewConfig.start;
-  const V_END   = viewConfig.end;
-  const V_TOTAL_DAYS = (V_END.getTime() - V_START.getTime()) / 86400000;
-  const V_MONTHS = viewConfig.months;
+  const [viewMode, setViewMode] = useState<ViewMode>('year');
 
-  const [cols, setCols] = useState(() => calcCols(window.innerWidth, viewConfig.numCols));
-  const { leftCol: LEFT_COL, assigneeCol: ASSIGNEE_COL, subCol: SUB_COL, monthCol: MONTH_COL, timelineW: TIMELINE_W } = cols;
+  const [screenW, setScreenW] = useState(window.innerWidth);
+  const [screenH, setScreenH] = useState(window.innerHeight);
+  useEffect(() => {
+    const onResize = () => { setScreenW(window.innerWidth); setScreenH(window.innerHeight); };
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+
+  const layout   = React.useMemo(() => calcLayout(viewMode, screenW), [viewMode, screenW]);
+  const LEFT_COL     = layout.leftCol;
+  const ASSIGNEE_COL = layout.assigneeCol;
+  const SUB_COL      = layout.subCol;
+  const MONTH_COL    = layout.colW;
+  const TIMELINE_W   = layout.totalTimelineW;
+
+  const gridColCount = viewMode === 'day' ? 365 : viewMode === 'week' ? 52 : 12;
+  const GridLines = (
+    <div style={{position:'absolute',inset:0,display:'flex',pointerEvents:'none',zIndex:0}}>
+      {Array.from({length: gridColCount}, (_,i) => (
+        <div key={i} style={{width:MONTH_COL,minWidth:MONTH_COL,flexShrink:0,height:'100%',borderRight:i<gridColCount-1?'1px solid #e8ecf8':'none'}} />
+      ))}
+    </div>
+  );
+
+  const V_START      = new Date('2026-01-01T00:00:00');
+  const V_END        = new Date('2026-12-31T00:00:00');
+  const V_TOTAL_DAYS = 365;
 
   const [projects, setProjects]               = useState<any[]>([]);
   const [searchQuery, setSearchQuery]         = useState('');
@@ -248,74 +322,146 @@ function GanttChart({ user, onLogout }: { user: any; onLogout: () => void }) {
   const [rowDrag, setRowDrag]                 = useState<any>(null);
   const [rowDragOver, setRowDragOver]         = useState<any>(null);
   const [groupOrder, setGroupOrder]           = useState<string[]>([]);
-  // ── Realtime 수신 알림 표시용 ──
   const [realtimeToast, setRealtimeToast]     = useState(false);
-
   const dragRef        = useRef<any>(null);
   const rowDragRef     = useRef<any>(null);
   const historyTimer   = useRef<ReturnType<typeof setTimeout> | null>(null);
   const headerRef      = useRef<HTMLDivElement>(null);
   const draggingRef    = useRef<any>(null);
-  const isSavingRef    = useRef<boolean>(false); // 내가 저장 중일 때 Realtime 토스트 무시
+  const isSavingRef    = useRef<boolean>(false);
   const toastTimer     = useRef<ReturnType<typeof setTimeout> | null>(null);
   const HISTORY_DEBOUNCE_MS = 5 * 60 * 1000;
 
-  // dragging state 변경 시 ref도 동기화
+  // ── 가로모드 헤더 자동 축소 ──
+  const [headerCollapsed, setHeaderCollapsed] = useState(false);
+  const lastScrollY = useRef(0);
+  const mobileScrollRef = useRef<HTMLDivElement>(null);
+
+
+
+
   useEffect(() => { draggingRef.current = dragging; }, [dragging]);
 
+  // 세로모드 전환 시 헤더 자동 펼침
+  const isPortrait = screenH > screenW;
+  useEffect(() => { if (isPortrait) setHeaderCollapsed(false); }, [isPortrait]);
   useEffect(() => {
-    const onResize = () => {
-      setCols(calcCols(window.innerWidth, viewConfig.numCols));
+    const el = mobileScrollRef.current;
+    if (!el) return;
+    const handler = () => {
+      if (isPortrait) { setHeaderCollapsed(false); return; }
+      const currentY = el.scrollTop;
+      const delta = currentY - lastScrollY.current;
+      if (delta > 8 && currentY > 30) setHeaderCollapsed(true);
+      else if (delta < -8) setHeaderCollapsed(false);
+      lastScrollY.current = currentY;
     };
-    window.addEventListener('resize', onResize);
-    return () => window.removeEventListener('resize', onResize);
-  }, [viewConfig.numCols]);
+    el.addEventListener("scroll", handler, { passive: true });
+    return () => el.removeEventListener("scroll", handler);
+  }, [isPortrait]);
 
-  useEffect(() => {
-    setCols(calcCols(window.innerWidth, viewConfig.numCols));
-  }, [viewMode]);
-
+  // ── [FIX] getPos: 날짜 → 픽셀 변환. 렌더 범위 클램프는 여기서만 담당 ──
   const getPos = useCallback((s: string, e: string) => {
     if (!s || !e) return null;
     const sd = parseDate(s), ed = parseDate(e);
     if (isNaN(sd.getTime()) || isNaN(ed.getTime())) return null;
-    const left  = Math.max(0, (sd.getTime() - V_START.getTime()) / 86400000 / V_TOTAL_DAYS * TIMELINE_W);
-    const right = Math.min(TIMELINE_W, (ed.getTime() - V_START.getTime()) / 86400000 / V_TOTAL_DAYS * TIMELINE_W);
+    const startDays = (sd.getTime() - V_START.getTime()) / 86400000;
+    const endDays   = (ed.getTime() - V_START.getTime()) / 86400000;
+    const left  = Math.max(0, startDays / V_TOTAL_DAYS * TIMELINE_W);
+    const right = Math.min(TIMELINE_W, endDays / V_TOTAL_DAYS * TIMELINE_W);
+    if (right <= left) return null; // 완전히 범위 밖이면 null
     return { left, width: Math.max(6, right - left) };
-  }, [TIMELINE_W, V_START, V_TOTAL_DAYS]);
+  }, [TIMELINE_W]);
 
-  const assignLanes = (tasks: any[]) => {
-    const BAR_GAP_PX = 4;
+  // ── [FIX] getProjectMeta: 실제 날짜(startDate/endDate)도 함께 반환 ──
+  // pos는 getPos 내부에서 렌더 클램프 처리, 툴팁은 반환된 startDate/endDate 사용
+  const getProjectMeta = useCallback((proj: any) => {
+    const tasks = proj.tasks.filter((t:any) => t.startDate && t.endDate);
+    if (!tasks.length) {
+      if (proj.startDate && proj.endDate) return {
+        pos: getPos(proj.startDate, proj.endDate),
+        progress: proj.progress || 0,
+        startDate: proj.startDate,
+        endDate: proj.endDate,
+      };
+      return { pos: null, progress: 0, startDate: '', endDate: '' };
+    }
+    // 진행률: 각 task의 duration 가중 평균
+    let totalW = 0, totalP = 0;
+    tasks.forEach((t:any) => {
+      const dur = Math.max(1, (parseDate(t.endDate).getTime() - parseDate(t.startDate).getTime()) / 86400000);
+      totalW += dur;
+      totalP += (t.progress || 0) * dur;
+    });
+    // 실제 task 기간의 min/max (clamp 없음 — getPos에서 처리)
+    const starts = tasks.map((t:any) => +parseDate(t.startDate));
+    const ends   = tasks.map((t:any) => +parseDate(t.endDate));
+    const realStart = toDateStr(new Date(Math.min(...starts)));
+    const realEnd   = toDateStr(new Date(Math.max(...ends)));
+    return {
+      pos: getPos(realStart, realEnd),
+      progress: totalW > 0 ? Math.round(totalP / totalW) : 0,
+      startDate: realStart,
+      endDate: realEnd,
+    };
+  }, [getPos]);
+
+  // ── [FIX] assignLanes: null pos 항목을 lane 계산에서 완전히 제외 ──
+  const TASK_ROW_H = 20; // 태스크 바 높이 (접힌 프로젝트 / 펼친 태스크 공통)
+  const TASK_GAP   = 4;  // 레인 간 간격
+  const BAR_GAP_PX = 4;  // 레인 배정 시 좌우 여유
+
+  const assignLanes = useCallback((tasks: any[]) => {
     const laneEnds: number[] = [];
     const sorted = [...tasks]
-      .map((task, origIdx) => ({ task, origIdx }))
+      .map((task, origIdx) => ({ task, origIdx, pos: getPos(task.startDate, task.endDate) }))
+      .filter(item => item.pos !== null) // null pos 제외하고 레인 계산
       .sort((a, b) => (a.task.startDate || '').localeCompare(b.task.startDate || ''));
-    const result: { task: any; lane: number; pos: any }[] = new Array(tasks.length);
-    sorted.forEach(({ task, origIdx }) => {
-      const pos = getPos(task.startDate, task.endDate);
-      if (!pos) { result[origIdx] = { task, lane: 0, pos: null }; return; }
-      const laneIdx = laneEnds.findIndex(end => end + BAR_GAP_PX <= pos.left);
+
+    // origIdx → lane 매핑
+    const laneMap: Record<number, number> = {};
+    sorted.forEach(({ origIdx, pos }) => {
+      const laneIdx = laneEnds.findIndex(end => end + BAR_GAP_PX <= pos!.left);
       const lane = laneIdx === -1 ? laneEnds.length : laneIdx;
-      laneEnds[lane] = pos.left + pos.width;
-      result[origIdx] = { task, lane, pos };
+      laneEnds[lane] = pos!.left + pos!.width;
+      laneMap[origIdx] = lane;
     });
-    return result;
+
+    return tasks.map((task, origIdx) => ({
+      task,
+      lane: laneMap[origIdx] ?? 0,
+      pos: getPos(task.startDate, task.endDate),
+    }));
+  }, [getPos]);
+
+  // lane 수에서 유효한 pos 가진 항목만 카운트
+  const calcLaneCount = (laned: ReturnType<typeof assignLanes>) => {
+    const validLanes = laned.filter(l => l.pos !== null).map(l => l.lane);
+    return validLanes.length > 0 ? Math.max(...validLanes) + 1 : 1;
   };
 
-  // ── 최초 로드 + Realtime 구독 ──────────────────────────
+  // 접힌 프로젝트 행의 minHeight 계산 (minHeight style과 실제 렌더 높이 통일)
+  const calcCollapsedMinH = useCallback((proj: any) => {
+    const validTasks = proj.tasks.filter((t:any) => t.startDate && t.endDate);
+    if (!validTasks.length) return 52;
+    const laned = assignLanes(validTasks);
+    const laneCount = calcLaneCount(laned);
+    const totalH = laneCount * (TASK_ROW_H + TASK_GAP) - TASK_GAP;
+    return Math.max(52, totalH + 12);
+  }, [assignLanes]);
+
   useEffect(() => {
+    setProjects([]);
     load();
 
     const channel = supabase
-      .channel('gantt-bus-sync')
+      .channel(currentApp.channel)
       .on(
         'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'gantt_projects', filter: 'id=eq.1' },
+        { event: 'UPDATE', schema: 'public', table: 'gantt_projects', filter: `id=eq.${appId}` },
         (payload: any) => {
-          // 내가 저장 중이거나 드래그 중이면 무시
           if (isSavingRef.current || draggingRef.current) return;
           setProjects(payload.new.data || []);
-          // 토스트 알림 표시
           if (toastTimer.current) clearTimeout(toastTimer.current);
           setRealtimeToast(true);
           toastTimer.current = setTimeout(() => setRealtimeToast(false), 2500);
@@ -327,13 +473,12 @@ function GanttChart({ user, onLogout }: { user: any; onLogout: () => void }) {
       supabase.removeChannel(channel);
       if (toastTimer.current) clearTimeout(toastTimer.current);
     };
-  }, []);
-  // ──────────────────────────────────────────────────────
+  }, [appId]);
 
   const load = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase.from('gantt_projects').select('data').eq('id', 1).single();
+      const { data, error } = await supabase.from('gantt_projects').select('data').eq('id', appId).single();
       if (!error && data) setProjects(data.data || []);
     } catch {}
     finally { setLoading(false); }
@@ -350,11 +495,11 @@ function GanttChart({ user, onLogout }: { user: any; onLogout: () => void }) {
     setSaving(true);
     isSavingRef.current = true;
     try {
-      await supabase.from('gantt_projects').upsert({ id: 1, data: p });
+      await supabase.from('gantt_projects').upsert({ id: appId, data: p });
     } catch {}
     finally {
       setSaving(false);
-      setTimeout(() => { isSavingRef.current = false; }, 1000); // 1초 여유
+      setTimeout(() => { isSavingRef.current = false; }, 1000);
     }
 
     if (historyTimer.current) clearTimeout(historyTimer.current);
@@ -385,7 +530,7 @@ function GanttChart({ user, onLogout }: { user: any; onLogout: () => void }) {
       if (data) {
         setProjects(data.data);
         setSaving(true);
-        try { await supabase.from('gantt_projects').upsert({ id: 1, data: data.data }); } catch {}
+        try { await supabase.from('gantt_projects').upsert({ id: appId, data: data.data }); } catch {}
         finally { setSaving(false); }
         await saveHistorySnapshot(data.data, '복원됨');
         setShowHistory(false);
@@ -427,24 +572,6 @@ function GanttChart({ user, onLogout }: { user: any; onLogout: () => void }) {
     save(projects.map(p => p.group === oldName ? {...p, group: newName.trim()} : p));
   };
 
-  const getProjectMeta = (proj: any) => {
-    const tasks = proj.tasks.filter((t:any) => t.startDate && t.endDate);
-    if (!tasks.length) {
-      if (proj.startDate && proj.endDate) return { pos:getPos(proj.startDate, proj.endDate), progress:proj.progress||0 };
-      return { pos:null, progress:0 };
-    }
-    const starts = tasks.map((t:any) => +parseDate(t.startDate));
-    const ends   = tasks.map((t:any) => +parseDate(t.endDate));
-    let totalW=0, totalP=0;
-    tasks.forEach((t:any) => {
-      const dur = Math.max(1, (parseDate(t.endDate).getTime()-parseDate(t.startDate).getTime())/86400000);
-      totalW+=dur; totalP+=(t.progress||0)*dur;
-    });
-    const visStart = toDateStr(new Date(Math.max(Math.min(...starts), +V_START)));
-    const visEnd   = toDateStr(new Date(Math.min(Math.max(...ends),   +V_END)));
-    return { pos:getPos(visStart, visEnd), progress:totalW>0?Math.round(totalP/totalW):0 };
-  };
-
   const handleMouseDown = (e: React.MouseEvent, pid: number, tid: any, type: string) => {
     e.preventDefault(); e.stopPropagation();
     if (tid==='__proj__') {
@@ -454,7 +581,7 @@ function GanttChart({ user, onLogout }: { user: any; onLogout: () => void }) {
       const task = projects.find(p=>p.id===pid)?.tasks.find((t:any)=>t.id===tid); if (!task) return;
       dragRef.current = { pid, tid, type, startX:e.clientX, startDate:task.startDate, endDate:task.endDate };
     }
-    isSavingRef.current = true; // 드래그 시작 시 내 액션으로 표시
+    isSavingRef.current = true;
     setDragging({ pid, tid, type });
   };
 
@@ -475,15 +602,37 @@ function GanttChart({ user, onLogout }: { user: any; onLogout: () => void }) {
       } else {
         ne=new Date(Math.min(+V_END,Math.max(+e0+deltaDays*86400000,+s0+86400000)));
       }
-      if (d.tid==='__proj__') { updateProject(d.pid,{startDate:toDateStr(ns),endDate:toDateStr(ne)}); setTooltip((t:any)=>t?{...t,startDate:toDateStr(ns),endDate:toDateStr(ne)}:t); }
-      else                    { updateTask(d.pid,d.tid,{startDate:toDateStr(ns),endDate:toDateStr(ne)}); setTooltip((t:any)=>t?{...t,startDate:toDateStr(ns),endDate:toDateStr(ne)}:t); }
+      const nsStr = toDateStr(ns), neStr = toDateStr(ne);
+      if (d.tid==='__proj__') {
+        setProjects(prev => prev.map(p => p.id!==d.pid ? p : {...p, startDate:nsStr, endDate:neStr}));
+      } else {
+        setProjects(prev => prev.map(p => p.id!==d.pid ? p : {...p, tasks:p.tasks.map((t:any)=>t.id!==d.tid?t:{...t,startDate:nsStr,endDate:neStr})}));
+      }
+      setTooltip((t:any)=>t?{...t,startDate:nsStr,endDate:neStr}:t);
     };
     const onUp = () => {
+      const d = dragRef.current;
       dragRef.current=null;
       setDragging(null);
       document.body.style.cursor='';
       document.body.style.userSelect='';
-      setTimeout(() => { isSavingRef.current = false; }, 1500); // 드래그 끝나고 save 완료될 때까지 여유
+      if (d) {
+        setProjects(prev => {
+          const latest = prev;
+          setSaving(true);
+          supabase.from('gantt_projects').upsert({ id: appId, data: latest })
+            .then(() => {
+              setSaving(false);
+              setTimeout(() => { isSavingRef.current = false; }, 1000);
+              if (historyTimer.current) clearTimeout(historyTimer.current);
+              historyTimer.current = setTimeout(() => { saveHistorySnapshot(latest); }, HISTORY_DEBOUNCE_MS);
+            })
+            .catch(() => { setSaving(false); setTimeout(() => { isSavingRef.current = false; }, 1000); });
+          return latest;
+        });
+      } else {
+        setTimeout(() => { isSavingRef.current = false; }, 1500);
+      }
     };
     document.body.style.userSelect='none';
     document.body.style.cursor=dragging.type==='move'?'grabbing':'ew-resize';
@@ -613,7 +762,7 @@ function GanttChart({ user, onLogout }: { user: any; onLogout: () => void }) {
     const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url; a.download = `샌디버스_간트차트_${new Date().toISOString().slice(0,10)}.csv`;
+    a.href = url; a.download = `${currentApp.csvPrefix}_간트차트_${new Date().toISOString().slice(0,10)}.csv`;
     a.click(); URL.revokeObjectURL(url);
   };
 
@@ -884,24 +1033,293 @@ function GanttChart({ user, onLogout }: { user: any; onLogout: () => void }) {
 
   const totalW = LEFT_COL + ASSIGNEE_COL + SUB_COL + TIMELINE_W;
 
+  // ── 모바일 판별 ──
+  // 폰 세로(<600) | 태블릿 세로(≤1024) | 폰 가로(<768) = 카드뷰
+  const isMobile = screenW < 600 || (isPortrait && screenW <= 1024) || (!isPortrait && screenW < 768);
+
+
+
+  if (isMobile) {
+    const getMiniPos = (s: string, e: string) => {
+      if (!s || !e) return null;
+      const sd = parseDate(s), ed = parseDate(e);
+      if (isNaN(sd.getTime()) || isNaN(ed.getTime())) return null;
+      const total = V_END.getTime() - V_START.getTime();
+      const left  = Math.max(0, Math.min(100, (sd.getTime() - V_START.getTime()) / total * 100));
+      const right = Math.max(0, Math.min(100, (ed.getTime() - V_START.getTime()) / total * 100));
+      return { left, width: Math.max(2, right - left) };
+    };
+
+    const todayPct = (() => {
+      const t = new Date();
+      if (t < V_START || t > V_END) return null;
+      return (t.getTime() - V_START.getTime()) / (V_END.getTime() - V_START.getTime()) * 100;
+    })();
+
+    return (
+      <div style={{height:'100vh',width:'100%',display:'flex',flexDirection:'column',background:'#0f0f1a',fontFamily:"'Pretendard',-apple-system,BlinkMacSystemFont,sans-serif",overflow:'hidden'}}>
+        <style>{`
+          @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
+          @keyframes spin{to{transform:rotate(360deg)}}
+          @keyframes fadeInDown{from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:translateY(0)}}
+          *{box-sizing:border-box;font-family:'Pretendard',-apple-system,BlinkMacSystemFont,sans-serif;}
+          .ms::-webkit-scrollbar{display:none}.ms{scrollbar-width:none}
+          .ghdr:active{opacity:0.75} .btask:active{opacity:0.7}
+          .hdr-collapsible{
+            overflow:hidden;
+            transition:max-height 0.3s cubic-bezier(0.4,0,0.2,1), opacity 0.25s ease;
+          }
+        `}</style>
+
+        {/* 모바일 헤더 */}
+        <div style={{background:'linear-gradient(135deg,#0f0f1a,#1a1a2e,#16213e)',borderBottom:'1px solid rgba(255,255,255,0.08)',flexShrink:0,boxShadow:'0 2px 16px rgba(0,0,0,0.4)',transition:'padding 0.28s ease',padding: (!isPortrait && headerCollapsed) ? '6px 14px' : '10px 14px'}}>
+
+          {/* 항상 보이는 슬림 바: 앱 전환 + 상태 + 로그아웃 */}
+          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom: (!isPortrait && headerCollapsed) ? 0 : 8, transition:'margin-bottom 0.28s ease'}}>
+            <div style={{display:'flex',alignItems:'center',gap:8}}>
+              <div style={{display:'flex',background:'rgba(255,255,255,0.07)',borderRadius:9,padding:3,border:'1px solid rgba(255,255,255,0.1)',gap:2}}>
+                {([2,1] as const).map(id=>(
+                  <button key={id} onClick={()=>onAppChange(id)}
+                    style={{padding:'5px 12px',borderRadius:7,border:'none',cursor:'pointer',fontSize:12,fontWeight:appId===id?700:400,
+                      background:appId===id?'linear-gradient(135deg,#6366f1,#8b5cf6)':'transparent',
+                      color:appId===id?'#fff':'rgba(148,163,184,0.7)',fontFamily:'inherit',
+                      boxShadow:appId===id?'0 2px 8px rgba(99,102,241,0.4)':'none',transition:'all 0.2s'}}>
+                    {id===2?'샌디앱':'버스'}
+                  </button>
+                ))}
+              </div>
+              {/* 가로모드일 때: 활성 카테고리 뱃지 인라인 표시 */}
+              {!isPortrait && headerCollapsed && activeCategories.length > 0 && (
+                <div style={{display:'flex',gap:4,alignItems:'center'}}>
+                  {activeCategories.map(cat=>{
+                    const cc=CATEGORY_COLORS[cat];
+                    return <span key={cat} style={{fontSize:10,padding:'2px 7px',borderRadius:10,background:`${cc.bg}33`,color:cc.border,border:`1px solid ${cc.border}55`,fontWeight:600}}>{cat}</span>;
+                  })}
+                </div>
+              )}
+            </div>
+            <div style={{display:'flex',alignItems:'center',gap:6}}>
+              {saving && (
+                <div style={{display:'flex',alignItems:'center',gap:4,fontSize:10,color:'#4ade80'}}>
+                  <div style={{width:8,height:8,border:'2px solid #4ade80',borderTopColor:'transparent',borderRadius:'50%',animation:'spin 0.8s linear infinite'}}/>저장중
+                </div>
+              )}
+              {realtimeToast && <span style={{fontSize:10,color:'#4ade80',background:'rgba(74,222,128,0.12)',padding:'2px 7px',borderRadius:8,border:'1px solid rgba(74,222,128,0.25)',fontWeight:600,animation:'fadeInDown 0.3s ease'}}>🔄 업데이트</span>}
+              <button onClick={onLogout} style={{padding:'5px 10px',background:'rgba(239,68,68,0.15)',border:'1px solid rgba(239,68,68,0.25)',borderRadius:7,cursor:'pointer',fontSize:11,color:'#fca5a5',fontFamily:'inherit'}}>로그아웃</button>
+            </div>
+          </div>
+
+          {/* 축소 가능한 카테고리 필터 행 — 가로모드 스크롤 다운 시 숨김 */}
+          <div className="hdr-collapsible" style={{
+            maxHeight: (!isPortrait && headerCollapsed) ? '0px' : '50px',
+            opacity:   (!isPortrait && headerCollapsed) ? 0 : 1,
+          }}>
+            <div className="ms" style={{display:'flex',gap:5,overflowX:'auto',paddingBottom:2}}>
+              <button onClick={()=>setActiveCategories([])}
+                style={{padding:'4px 12px',borderRadius:20,fontSize:11,cursor:'pointer',fontWeight:activeCategories.length===0?600:400,
+                  border:activeCategories.length===0?'1.5px solid #818cf8':'1.5px solid rgba(255,255,255,0.2)',
+                  background:activeCategories.length===0?'rgba(99,102,241,0.35)':'rgba(255,255,255,0.07)',
+                  color:activeCategories.length===0?'#fff':'#e2e8f0',whiteSpace:'nowrap',flexShrink:0,fontFamily:'inherit'}}>
+                전체 {projects.length}
+              </button>
+              {CATEGORIES.map(cat=>{
+                const isActive=activeCategories.includes(cat);
+                const cc=CATEGORY_COLORS[cat];
+                return (
+                  <button key={cat} onClick={()=>setActiveCategories(prev=>prev.includes(cat)?prev.filter(c=>c!==cat):[...prev,cat])}
+                    style={{padding:'4px 12px',borderRadius:20,fontSize:11,cursor:'pointer',fontWeight:isActive?600:400,
+                      border:isActive?`1.5px solid ${cc.border}`:'1.5px solid rgba(255,255,255,0.2)',
+                      background:isActive?`${cc.bg}22`:'rgba(255,255,255,0.07)',
+                      color:isActive?cc.border:'#e2e8f0',whiteSpace:'nowrap',flexShrink:0,fontFamily:'inherit'}}>
+                    {cat}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
+        {/* 스크롤 영역 */}
+        <div ref={mobileScrollRef} className="ms" style={{flex:1,overflowY:'auto',padding:'10px 12px 90px'}}>
+
+
+
+
+
+
+
+
+
+
+          {groupedFiltered.length===0 ? (
+            <div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'80px 0',color:'#475569',gap:10}}>
+              <span style={{fontSize:32}}>📋</span>
+              <span style={{fontSize:14}}>프로젝트가 없습니다</span>
+              <button onClick={addProject} style={{color:'#6366f1',background:'none',border:'1px solid rgba(99,102,241,0.3)',borderRadius:20,padding:'6px 16px',cursor:'pointer',fontSize:13,fontFamily:'inherit'}}>+ 프로젝트 추가</button>
+            </div>
+          ) : groupedFiltered.map(group=>(
+            <div key={group.name} style={{marginBottom:14}}>
+              {/* 그룹 헤더 */}
+              <div className="ghdr" onClick={()=>toggleGroup(group.name)}
+                style={{display:'flex',alignItems:'center',gap:7,padding:'7px 10px',background:'rgba(99,102,241,0.1)',borderRadius:10,marginBottom:8,borderLeft:'3px solid #6366f1',cursor:'pointer',userSelect:'none'}}>
+                <span style={{fontSize:13}}>📁</span>
+                <span style={{fontSize:13,fontWeight:800,color:'#e2e8f0',flex:1}}>{group.name}</span>
+                <span style={{fontSize:11,color:'#6366f1',background:'rgba(99,102,241,0.15)',padding:'1px 7px',borderRadius:10,fontWeight:600}}>{group.items.length}개</span>
+                <span style={{fontSize:11,color:'#6366f1',transition:'transform 0.2s',display:'inline-block',transform:collapsedGroups.has(group.name)?'rotate(0deg)':'rotate(90deg)'}}>▶</span>
+              </div>
+
+              {!collapsedGroups.has(group.name) && group.items.map((proj:any)=>{
+                const c=COLOR_MAP[proj.color]||COLOR_MAP.blue;
+                const catColor=CATEGORY_COLORS[proj.category];
+                const {progress:projProg,startDate:projStart,endDate:projEnd}=getProjectMeta(proj);
+                const projMiniPos=getMiniPos(projStart,projEnd);
+                return (
+                  <div key={proj.id}
+                    style={{background:'rgba(255,255,255,0.03)',border:`1px solid ${catColor?catColor.border+'33':c.border+'33'}`,borderRadius:12,marginBottom:8,overflow:'hidden'}}>
+
+                    {/* 프로젝트 헤더 */}
+                    <div style={{padding:'10px 12px 8px'}}>
+                      <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',gap:8,marginBottom:6}}>
+                        <div style={{display:'flex',alignItems:'center',gap:6,flex:1,flexWrap:'wrap'}}>
+                          {catColor && <span style={{fontSize:11,fontWeight:700,padding:'2px 7px',borderRadius:8,background:catColor.bg,color:catColor.text,border:`1px solid ${catColor.border}`,flexShrink:0}}>{proj.category}</span>}
+                          <span style={{fontSize:13,fontWeight:700,color:'#f1f5f9',lineHeight:1.3}}>{proj.name}</span>
+                        </div>
+                        <div style={{display:'flex',alignItems:'center',gap:4,flexShrink:0}}>
+                          <span style={{fontSize:11,fontWeight:700,padding:'2px 8px',borderRadius:10,background:catColor?`${catColor.bg}33`:'rgba(59,130,246,0.15)',color:catColor?catColor.border:'#60a5fa'}}>{projProg}%</span>
+                          <button onClick={()=>setEditingProject(proj)} style={{padding:4,background:'none',border:'none',cursor:'pointer',fontSize:14,lineHeight:1}}>✏️</button>
+                          <button onClick={()=>deleteProject(proj.id)} style={{padding:4,background:'none',border:'none',cursor:'pointer',fontSize:14,lineHeight:1}}>🗑️</button>
+                        </div>
+                      </div>
+                      {(proj.owner||proj.subOwner) && <div style={{fontSize:11,color:'#94a3b8',marginBottom:4}}>👤 {[proj.owner,proj.subOwner].filter(Boolean).join(' · ')}</div>}
+                      {projStart && <div style={{fontSize:11,color:'#94a3b8',marginBottom:6}}>📅 {projStart} → {projEnd}</div>}
+                      {/* 미니 간트바 */}
+                      {projMiniPos && (
+                        <div style={{position:'relative',marginBottom:2}}>
+                          <div style={{height:5,background:'rgba(255,255,255,0.05)',borderRadius:3,position:'relative',overflow:'visible'}}>
+                            <div style={{position:'absolute',top:0,left:`${projMiniPos.left}%`,width:`${projMiniPos.width}%`,height:'100%',background:catColor?`${catColor.border}33`:c.barLight,borderRadius:3}}/>
+                            <div style={{position:'absolute',top:0,left:`${projMiniPos.left}%`,width:`${projMiniPos.width*(projProg/100)}%`,height:'100%',background:catColor?catColor.border:c.bar,borderRadius:3,opacity:0.9}}/>
+                            {todayPct!==null&&<div style={{position:'absolute',left:`${todayPct}%`,top:-3,width:2,height:11,background:'#ef4444',borderRadius:1,zIndex:2}}/>}
+                          </div>
+                          <div style={{display:'flex',justifyContent:'space-between',marginTop:3,fontSize:9,color:'#475569'}}>
+                            <span>1월</span><span>4월</span><span>7월</span><span>10월</span><span>12월</span>
+                          </div>
+                        </div>
+                      )}
+                      {proj.description&&<div style={{fontSize:12,color:'#64748b',marginTop:4,lineHeight:1.4}}>{proj.description}</div>}
+                    </div>
+
+                    {/* Task 리스트 (펼침) */}
+                    {proj.expanded && proj.tasks.length>0 && (
+                      <div style={{borderTop:'1px solid rgba(255,255,255,0.05)',padding:'6px 12px 6px'}}>
+                        {proj.tasks.map((task:any)=>{
+                          const tc=CATEGORY_COLORS[task.category];
+                          const tp=getMiniPos(task.startDate,task.endDate);
+                          return (
+                            <div key={task.id} style={{padding:'6px 8px',borderRadius:8,marginBottom:4,background:'rgba(255,255,255,0.02)',border:'1px solid rgba(255,255,255,0.04)'}}>
+                              <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:6,marginBottom:tp?3:0}}>
+                                <div style={{display:'flex',alignItems:'center',gap:5,flex:1,minWidth:0}}>
+                                  <span style={{color:'rgba(167,139,250,0.5)',fontSize:11,flexShrink:0}}>└</span>
+                                  {task.category&&tc&&<span style={{fontSize:10,fontWeight:700,padding:'1px 5px',borderRadius:6,background:tc.bg,color:tc.text,border:`1px solid ${tc.border}`,flexShrink:0}}>{task.category}</span>}
+                                  <span style={{fontSize:12,color:'#e2e8f0',fontWeight:500,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{task.name}</span>
+                                </div>
+                                <div style={{display:'flex',alignItems:'center',gap:3,flexShrink:0}}>
+                                  <span style={{fontSize:10,color:'#475569',whiteSpace:'nowrap'}}>{task.startDate?.slice(5)} → {task.endDate?.slice(5)}</span>
+                                  <button onClick={()=>setEditingTask({task,pid:proj.id})} style={{padding:2,background:'none',border:'none',cursor:'pointer',fontSize:12,lineHeight:1}}>✏️</button>
+                                  <button onClick={()=>deleteTask(proj.id,task.id)} style={{padding:2,background:'none',border:'none',cursor:'pointer',fontSize:12,lineHeight:1}}>🗑️</button>
+                                </div>
+                              </div>
+                              {tp&&(
+                                <div style={{height:3,background:'rgba(255,255,255,0.04)',borderRadius:2,position:'relative',overflow:'hidden'}}>
+                                  <div style={{position:'absolute',top:0,left:`${tp.left}%`,width:`${tp.width}%`,height:'100%',background:tc?tc.bg:'rgba(255,255,255,0.08)'}}/>
+                                  <div style={{position:'absolute',top:0,left:`${tp.left}%`,width:`${tp.width*(task.progress||0)/100}%`,height:'100%',background:tc?tc.border:c.bar,opacity:0.85}}/>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    {/* 접힘 상태 안내 */}
+                    {!proj.expanded && proj.tasks.length>0 && (
+                      <div style={{padding:'4px 12px 6px',borderTop:'1px solid rgba(255,255,255,0.04)'}}>
+                        <span style={{fontSize:11,color:'#475569'}}>▶ Task {proj.tasks.length}개 · 펼치기 버튼으로 확인</span>
+                      </div>
+                    )}
+
+                    {/* 하단 액션 바 */}
+                    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'6px 12px 9px',borderTop:'1px solid rgba(255,255,255,0.05)'}}>
+                      <button onClick={()=>toggleProject(proj.id)}
+                        style={{fontSize:11,color:'#6366f1',background:'none',border:'none',cursor:'pointer',fontFamily:'inherit',display:'flex',alignItems:'center',gap:3}}>
+                        {proj.expanded?'▲ 접기':'▼ 펼치기'}
+                      </button>
+                      {/* Task 추가 버튼 — A안 실선 아웃라인 */}
+                      <button className="btask"
+                        onClick={()=>{if(!proj.expanded)toggleProject(proj.id);addTask(proj.id);}}
+                        style={{display:'flex',alignItems:'center',gap:5,padding:'5px 14px',
+                          background:'rgba(99,102,241,0.1)',
+                          border:'1px solid rgba(99,102,241,0.4)',
+                          borderRadius:20,fontSize:12,fontWeight:600,color:'#818cf8',
+                          cursor:'pointer',fontFamily:'inherit',whiteSpace:'nowrap'}}>
+                        ＋ Task 추가
+                      </button>
+                    </div>
+
+                  </div>
+                );
+              })}
+            </div>
+          ))}
+        </div>
+
+        {/* 프로젝트 추가 FAB */}
+        <button onClick={addProject}
+          style={{position:'fixed',bottom:24,right:18,width:52,height:52,
+            background:'linear-gradient(135deg,#6366f1,#8b5cf6)',border:'none',borderRadius:'50%',
+            display:'flex',alignItems:'center',justifyContent:'center',
+            fontSize:26,color:'white',cursor:'pointer',
+            boxShadow:'0 4px 20px rgba(99,102,241,0.55)',zIndex:30,fontFamily:'inherit'}}>
+          +
+        </button>
+
+        {editingProject && <ProjectEditModal proj={editingProject} onClose={()=>setEditingProject(null)} />}
+        {editingTask && <TaskEditModal task={editingTask.task} pid={editingTask.pid} onClose={()=>setEditingTask(null)} />}
+        {showChangePw && <ChangePwModal />}
+      </div>
+    );
+  }
+  // ── 모바일 끝 ──
+
+
   return (
     <div style={{height:'100vh',width:'100%',background:'#eef0f5',display:'flex',flexDirection:'column',overflow:'hidden',fontFamily:"'Pretendard',-apple-system,BlinkMacSystemFont,sans-serif"}}>
       <style>{`
         @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
         @keyframes spin{to{transform:rotate(360deg)}}
         @keyframes fadeInDown{from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:translateY(0)}}
+        @keyframes fadeOut{from{opacity:1}to{opacity:0}}
         *{box-sizing:border-box; font-family:'Pretendard',-apple-system,BlinkMacSystemFont,sans-serif;}
       `}</style>
-
-      {/* Realtime 수신 토스트 - 헤더에서 인라인으로 표시 */}
 
       {/* Header */}
       <div ref={headerRef} style={{background:'linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 60%, #16213e 100%)',borderBottom:'1px solid rgba(255,255,255,0.08)',padding:'16px 24px',flexShrink:0,boxShadow:'0 2px 16px rgba(0,0,0,0.4)',position:'sticky',top:0,zIndex:30}}>
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:8}}>
           <div style={{display:'flex',alignItems:'center',gap:12}}>
-            <div style={{width:36,height:36,borderRadius:10,background:'linear-gradient(135deg,#6366f1,#a855f7)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:18,boxShadow:'0 2px 8px rgba(99,102,241,0.4)'}}>📊</div>
             <div>
-              <h1 style={{fontSize:18,fontWeight:'bold',color:'#f1f5f9',margin:0,letterSpacing:'-0.3px'}}>샌디버스 간트차트</h1>
+              <div style={{display:'flex',alignItems:'center',gap:0,background:'rgba(255,255,255,0.07)',borderRadius:10,padding:4,border:'1px solid rgba(255,255,255,0.1)'}}>
+                {([2,1] as const).map(id => (
+                  <button key={id} onClick={()=>onAppChange(id)}
+                    style={{display:'flex',alignItems:'center',gap:6,padding:'7px 16px',borderRadius:8,border:'none',cursor:'pointer',transition:'all 0.2s',
+                      background: appId===id ? 'linear-gradient(135deg,#6366f1,#8b5cf6)' : 'transparent',
+                      color: appId===id ? '#fff' : 'rgba(148,163,184,0.7)',
+                      fontWeight: appId===id ? 700 : 400,
+                      fontSize: 14,
+                      boxShadow: appId===id ? '0 2px 8px rgba(99,102,241,0.4)' : 'none',
+                    }}>
+                    {id===2 ? '샌디앱 간트차트' : '통근버스 간트차트'}
+                  </button>
+                ))}
+              </div>
               <div style={{display:'flex',alignItems:'center',gap:8,marginTop:2}}>
                 <p style={{fontSize:11,color:'rgba(148,163,184,0.8)',margin:0}}>2026년 · Supabase 연동 · 실시간 동기화 🟢</p>
                 {realtimeToast && (
@@ -932,8 +1350,14 @@ function GanttChart({ user, onLogout }: { user: any; onLogout: () => void }) {
               ⬇ CSV
             </button>
             <div style={{display:'flex',alignItems:'center',background:'rgba(255,255,255,0.07)',borderRadius:8,border:'1px solid rgba(255,255,255,0.12)',padding:2,gap:2}}>
-              {([['half','6개월'] as const,['year','12개월'] as const]).map(([mode,label])=>(
-                <button key={mode} onClick={()=>setViewMode(mode)}
+              <span style={{fontSize:10,color:'rgba(148,163,184,0.5)',padding:'0 4px',userSelect:'none'}}>🔍</span>
+              {([
+                ['year','월','12개월 한화면'] as const,
+                ['half','월↔','6개월씩 스크롤'] as const,
+                ['week','주','주단위 스크롤'] as const,
+                ['day','일','일단위 스크롤'] as const,
+              ]).map(([mode,label,title])=>(
+                <button key={mode} onClick={()=>setViewMode(mode)} title={title}
                   style={{height:26,padding:'0 10px',borderRadius:6,border:'none',cursor:'pointer',fontSize:12,fontWeight:viewMode===mode?700:400,
                     background:viewMode===mode?'rgba(99,102,241,0.9)':'transparent',
                     color:viewMode===mode?'white':'rgba(148,163,184,0.8)',
@@ -1015,16 +1439,73 @@ function GanttChart({ user, onLogout }: { user: any; onLogout: () => void }) {
       <div style={{overflowX:'auto',overflowY:'auto',flex:1}}>
         <div style={{minWidth:totalW}}>
           {/* Column Header */}
-          <div style={{display:'flex',position:'sticky',top:0,zIndex:20,background:'white',borderBottom:'1px solid #e5e7eb',boxShadow:'0 1px 3px rgba(0,0,0,0.05)',width:totalW}}>
-            <div style={{width:LEFT_COL,minWidth:LEFT_COL,flexShrink:0,padding:'12px 16px',fontWeight:600,fontSize:14,color:'#374151',borderRight:'1px solid #e5e7eb',background:'#f9fafb',position:'sticky',left:0,zIndex:10}}>프로젝트 / Task</div>
-            <div style={{width:ASSIGNEE_COL,minWidth:ASSIGNEE_COL,flexShrink:0,padding:'12px 4px',fontWeight:600,fontSize:13,color:'#374151',borderRight:'1px solid #e5e7eb',background:'#f9fafb',textAlign:'center',position:'sticky',left:LEFT_COL,zIndex:10}}>담당(정)</div>
-            <div style={{width:SUB_COL,minWidth:SUB_COL,flexShrink:0,padding:'12px 4px',fontWeight:600,fontSize:13,color:'#374151',borderRight:'1px solid #e5e7eb',background:'#f9fafb',textAlign:'center',position:'sticky',left:LEFT_COL+ASSIGNEE_COL,zIndex:10}}>담당(부)</div>
-            <div style={{display:'flex',width:TIMELINE_W,minWidth:TIMELINE_W,flexShrink:0}}>
-              {V_MONTHS.map((m,i)=>(
-                <div key={i} style={{width:MONTH_COL,minWidth:MONTH_COL,textAlign:'center',padding:'12px 0',fontSize:12,fontWeight:600,color:'#4b5563',borderRight:i<V_MONTHS.length-1?'1px solid #e5e7eb':'none',background:'#f9fafb'}}>{m}</div>
-              ))}
+          {(viewMode === 'day' || viewMode === 'week') ? (
+            <div style={{position:'sticky',top:0,zIndex:20,background:'white',borderBottom:'2px solid #e2e8f0',boxShadow:'0 1px 3px rgba(0,0,0,0.05)',width:totalW}}>
+              {/* 1행: 월 띠 */}
+              <div style={{display:'flex',height:20,borderBottom:'1px solid #e8ecf8'}}>
+                <div style={{width:LEFT_COL+ASSIGNEE_COL+SUB_COL,minWidth:LEFT_COL+ASSIGNEE_COL+SUB_COL,flexShrink:0,background:'#f9fafb',borderRight:'1px solid #e5e7eb',position:'sticky',left:0,zIndex:10}} />
+                <div style={{display:'flex',width:TIMELINE_W,minWidth:TIMELINE_W,flexShrink:0,overflow:'hidden'}}>
+                  {(viewMode === 'day' ? DAY_HEADERS : WEEK_HEADERS).reduce((acc: any[], h: any) => {
+                    const isFirst = viewMode === 'day' ? h.isFirst : h.isFirstOfMonth;
+                    if (isFirst || acc.length === 0) acc.push({ month: h.month, count: 1 });
+                    else acc[acc.length - 1].count++;
+                    return acc;
+                  }, []).map((seg: any, i: number) => (
+                    <div key={i} style={{
+                      width: seg.count * MONTH_COL, minWidth: seg.count * MONTH_COL, flexShrink: 0,
+                      height: 20,
+                      background: ['#eff6ff','#f0fdf4','#fef3c7','#fdf4ff','#fff7ed','#f0fdfa','#fef9c3','#faf5ff','#fff1f2','#f0f9ff','#fefce8','#f5f3ff'][i % 12],
+                      borderRight: '1px solid #e8ecf8',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
+                    }}>
+                      <span style={{fontSize:10,fontWeight:700,color:'#374151',whiteSpace:'nowrap'}}>{seg.month}월</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              {/* 2행: 날짜 or 주 번호 */}
+              <div style={{display:'flex',height:22}}>
+                <div style={{width:LEFT_COL,minWidth:LEFT_COL,flexShrink:0,padding:'0 16px',fontWeight:600,fontSize:13,color:'#374151',borderRight:'1px solid #e5e7eb',background:'#f9fafb',position:'sticky',left:0,zIndex:10,display:'flex',alignItems:'center'}}>프로젝트 / Task</div>
+                <div style={{width:ASSIGNEE_COL,minWidth:ASSIGNEE_COL,flexShrink:0,fontWeight:600,fontSize:12,color:'#374151',borderRight:'1px solid #e5e7eb',background:'#f9fafb',textAlign:'center',position:'sticky',left:LEFT_COL,zIndex:10,display:'flex',alignItems:'center',justifyContent:'center'}}>담당(정)</div>
+                <div style={{width:SUB_COL,minWidth:SUB_COL,flexShrink:0,fontWeight:600,fontSize:12,color:'#374151',borderRight:'1px solid #e5e7eb',background:'#f9fafb',textAlign:'center',position:'sticky',left:LEFT_COL+ASSIGNEE_COL,zIndex:10,display:'flex',alignItems:'center',justifyContent:'center'}}>담당(부)</div>
+                <div style={{display:'flex',width:TIMELINE_W,minWidth:TIMELINE_W,flexShrink:0,overflow:'hidden'}}>
+                  {viewMode === 'week'
+                    ? WEEK_HEADERS.map((h,i)=>(
+                        <div key={i} style={{
+                          width:MONTH_COL,minWidth:MONTH_COL,flexShrink:0,
+                          display:'flex',alignItems:'center',justifyContent:'center',
+                          fontSize:12,fontWeight:h.isFirstOfMonth?700:500,
+                          color:h.isFirstOfMonth?'#1d4ed8':'#4b5563',
+                          borderRight:'1px solid #e8ecf8',
+                          background:h.isFirstOfMonth?'#eff6ff':'#f9fafb',
+                        }}>{h.label}</div>
+                      ))
+                    : DAY_HEADERS.map((h,i)=>(
+                        <div key={i} style={{
+                          width:MONTH_COL,minWidth:MONTH_COL,flexShrink:0,
+                          display:'flex',alignItems:'center',justifyContent:'center',
+                          fontSize:11,fontWeight:h.isFirst?600:400,
+                          color:h.isFirst?'#1d4ed8':'#6b7280',
+                          borderRight:'1px solid #e8ecf8',
+                          background:h.isFirst?'#eff6ff':'#f9fafb',
+                        }}>{h.day}</div>
+                      ))
+                  }
+                </div>
+              </div>
             </div>
-          </div>
+          ) : (
+            <div style={{display:'flex',position:'sticky',top:0,zIndex:20,background:'white',borderBottom:'1px solid #e5e7eb',boxShadow:'0 1px 3px rgba(0,0,0,0.05)',width:totalW,height:42}}>
+              <div style={{width:LEFT_COL,minWidth:LEFT_COL,flexShrink:0,padding:'0 16px',fontWeight:600,fontSize:14,color:'#374151',borderRight:'1px solid #e5e7eb',background:'#f9fafb',position:'sticky',left:0,zIndex:10,display:'flex',alignItems:'center'}}>프로젝트 / Task</div>
+              <div style={{width:ASSIGNEE_COL,minWidth:ASSIGNEE_COL,flexShrink:0,fontWeight:600,fontSize:13,color:'#374151',borderRight:'1px solid #e5e7eb',background:'#f9fafb',textAlign:'center',position:'sticky',left:LEFT_COL,zIndex:10,display:'flex',alignItems:'center',justifyContent:'center'}}>담당(정)</div>
+              <div style={{width:SUB_COL,minWidth:SUB_COL,flexShrink:0,fontWeight:600,fontSize:13,color:'#374151',borderRight:'1px solid #e5e7eb',background:'#f9fafb',textAlign:'center',position:'sticky',left:LEFT_COL+ASSIGNEE_COL,zIndex:10,display:'flex',alignItems:'center',justifyContent:'center'}}>담당(부)</div>
+              <div style={{display:'flex',width:TIMELINE_W,minWidth:TIMELINE_W,flexShrink:0,alignItems:'center'}}>
+                {MONTH_LABELS.map((m,i)=>(
+                  <div key={i} style={{width:MONTH_COL,minWidth:MONTH_COL,flexShrink:0,textAlign:'center',height:'100%',display:'flex',alignItems:'center',justifyContent:'center',fontSize:12,fontWeight:600,color:'#4b5563',borderRight:i<11?'1px solid #e5e7eb':'none',background:'#f9fafb'}}>{m}</div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Rows */}
           <div style={{width:totalW}}>
@@ -1069,50 +1550,99 @@ function GanttChart({ user, onLogout }: { user: any; onLogout: () => void }) {
                   </div>
                   <div style={{width:ASSIGNEE_COL,minWidth:ASSIGNEE_COL,flexShrink:0,borderRight:'1px solid #e5e7eb',position:'sticky',left:LEFT_COL,zIndex:8,background:'inherit'}} />
                   <div style={{width:SUB_COL,minWidth:SUB_COL,flexShrink:0,borderRight:'1px solid #e5e7eb',position:'sticky',left:LEFT_COL+ASSIGNEE_COL,zIndex:8,background:'inherit'}} />
-                  <div style={{width:TIMELINE_W,minWidth:TIMELINE_W,flexShrink:0,position:'relative',minHeight:collapsedGroups.has(group.name)?Math.max(44,group.items.length*26+12):44}}>
-                    {V_MONTHS.map((_,i)=><div key={i} style={{width:MONTH_COL,height:'100%',position:'absolute',left:i*MONTH_COL,top:0,borderRight:i<V_MONTHS.length-1?'1px solid #e8ecf8':'none'}} />)}
+                  {/* ── 그룹 접힘 시: 프로젝트들의 기간바를 레인 패킹으로 표시 ── */}
+                  <div style={{width:TIMELINE_W,minWidth:TIMELINE_W,flexShrink:0,position:'relative',minHeight:(()=>{
+                    if (!collapsedGroups.has(group.name)) return 44;
+                    const projsWithDate = group.items.map((proj:any) => {
+                      const tasks = proj.tasks.filter((t:any) => t.startDate && t.endDate);
+                      const sd = tasks.length ? tasks.map((t:any)=>t.startDate).sort()[0] : (proj.startDate||'');
+                      const ed = tasks.length ? tasks.map((t:any)=>t.endDate).sort().reverse()[0] : (proj.endDate||'');
+                      return { startDate: sd, endDate: ed };
+                    });
+                    const laneEnds: number[] = [];
+                    const sorted = [...projsWithDate]
+                      .map((p, i) => ({ p, i, pos: getPos(p.startDate, p.endDate) }))
+                      .filter(x => x.pos)
+                      .sort((a, b) => a.p.startDate.localeCompare(b.p.startDate));
+                    sorted.forEach(({ pos }) => {
+                      const li = laneEnds.findIndex(e => e + BAR_GAP_PX <= pos!.left);
+                      const lane = li === -1 ? laneEnds.length : li;
+                      laneEnds[lane] = pos!.left + pos!.width;
+                    });
+                    const laneCount = laneEnds.length || 1;
+                    const totalH = laneCount * (TASK_ROW_H + TASK_GAP) - TASK_GAP;
+                    return Math.max(44, totalH + 12);
+                  })()}}>
+                    {GridLines}
                     {todayLeft!==null && <div style={{position:'absolute',left:todayLeft,top:0,bottom:0,width:2,background:'#ef4444',opacity:0.3,zIndex:5}} />}
-                    {collapsedGroups.has(group.name) && group.items.map((proj:any, pi:number) => {
-                      const { pos } = getProjectMeta(proj);
-                      const c = COLOR_MAP[proj.color] || COLOR_MAP.blue;
-                      if (!pos) return null;
-                      const ROW_H = 22;
-                      const GAP = 4;
-                      const totalH = group.items.length * (ROW_H + GAP) - GAP;
-                      const minContainerH = 44;
-                      const containerH = Math.max(minContainerH, totalH + 12);
-                      const topOffset = (containerH - totalH) / 2 + pi * (ROW_H + GAP);
-                      const { startDate, endDate } = (() => {
+                    {collapsedGroups.has(group.name) && (()=>{
+                      // 프로젝트별 실제 기간 계산 (getProjectMeta 동일 로직)
+                      const projBars = group.items.map((proj:any) => {
+                        const c = COLOR_MAP[proj.color] || COLOR_MAP.blue;
+                        const catColor = CATEGORY_COLORS[proj.category];
+                        const barBg = catColor ? catColor.border : c.bar;
                         const tasks = proj.tasks.filter((t:any) => t.startDate && t.endDate);
-                        if (tasks.length === 0) return { startDate: proj.startDate||'', endDate: proj.endDate||'' };
-                        const starts = tasks.map((t:any) => t.startDate).sort();
-                        const ends = tasks.map((t:any) => t.endDate).sort();
-                        return { startDate: starts[0], endDate: ends[ends.length-1] };
-                      })();
-                      const catColor = CATEGORY_COLORS[proj.category];
-                      const barBg = catColor ? catColor.border : c.bar;
-                      return (
-                        <div key={proj.id}
-                          onMouseEnter={e=>{setTooltip({startDate,endDate,name:proj.name});setTooltipPos({x:e.clientX,y:e.clientY});}}
-                          onMouseMove={e=>setTooltipPos({x:e.clientX,y:e.clientY})}
-                          onMouseLeave={()=>setTooltip(null)}
-                          style={{position:'absolute',left:pos.left,width:pos.width,height:ROW_H,top:topOffset,background:barBg,borderRadius:4,opacity:0.9,zIndex:6,cursor:'default',display:'flex',alignItems:'center',overflow:'hidden',minWidth:4,border:`1px solid ${barBg}`,boxShadow:`0 1px 4px ${barBg}55`}}>
-                          {pos.width > 40 && (
-                            <span style={{fontSize:12,color:'white',fontWeight:700,padding:'0 8px',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',lineHeight:1,textShadow:'0 1px 3px rgba(0,0,0,0.5)',maxWidth:pos.width-4}}>
-                              {proj.name}
-                            </span>
-                          )}
-                        </div>
-                      );
-                    })}
+                        const startDate = tasks.length
+                          ? tasks.map((t:any) => t.startDate).sort()[0]
+                          : (proj.startDate || '');
+                        const endDate = tasks.length
+                          ? tasks.map((t:any) => t.endDate).sort().reverse()[0]
+                          : (proj.endDate || '');
+                        const pos = getPos(startDate, endDate);
+                        return { proj, startDate, endDate, pos, barBg };
+                      });
+
+                      // 레인 배정 (null pos 제외)
+                      const laneEnds: number[] = [];
+                      const sorted = [...projBars]
+                        .map((item, origIdx) => ({ item, origIdx }))
+                        .filter(({ item }) => item.pos !== null)
+                        .sort((a, b) => a.item.startDate.localeCompare(b.item.startDate));
+                      const laneMap: Record<number, number> = {};
+                      sorted.forEach(({ item, origIdx }) => {
+                        const laneIdx = laneEnds.findIndex(end => end + BAR_GAP_PX <= item.pos!.left);
+                        const lane = laneIdx === -1 ? laneEnds.length : laneIdx;
+                        laneEnds[lane] = item.pos!.left + item.pos!.width;
+                        laneMap[origIdx] = lane;
+                      });
+
+                      const validLanes = Object.values(laneMap);
+                      const laneCount = validLanes.length > 0 ? Math.max(...validLanes) + 1 : 1;
+                      const totalH = laneCount * (TASK_ROW_H + TASK_GAP) - TASK_GAP;
+                      const containerH = Math.max(44, totalH + 12);
+                      const topBase = (containerH - totalH) / 2;
+
+                      return projBars.map((item, origIdx) => {
+                        if (!item.pos) return null;
+                        const lane = laneMap[origIdx] ?? 0;
+                        const topOffset = topBase + lane * (TASK_ROW_H + TASK_GAP);
+                        return (
+                          <div key={item.proj.id}
+                            onMouseEnter={e=>{setTooltip({startDate:item.startDate,endDate:item.endDate,name:item.proj.name});setTooltipPos({x:e.clientX,y:e.clientY});}}
+                            onMouseMove={e=>setTooltipPos({x:e.clientX,y:e.clientY})}
+                            onMouseLeave={()=>setTooltip(null)}
+                            style={{position:'absolute',left:item.pos.left,width:item.pos.width,height:TASK_ROW_H,top:topOffset,background:item.barBg,borderRadius:4,opacity:0.9,zIndex:6,cursor:'default',display:'flex',alignItems:'center',overflow:'hidden',minWidth:4,border:`1px solid ${item.barBg}`,boxShadow:`0 1px 4px ${item.barBg}55`}}>
+                            {item.pos.width > 40 && (
+                              <span style={{fontSize:11,color:'white',fontWeight:700,padding:'0 8px',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',lineHeight:1,textShadow:'0 1px 3px rgba(0,0,0,0.5)',maxWidth:item.pos.width-4}}>
+                                {item.proj.name}
+                              </span>
+                            )}
+                          </div>
+                        );
+                      });
+                    })()}
                   </div>
                 </div>
 
                 {/* 그룹 내 프로젝트 */}
                 {!collapsedGroups.has(group.name) && group.items.map(proj=>{
                   const c=COLOR_MAP[proj.color]||COLOR_MAP.blue;
-                  const {pos:projPos,progress:projProg}=getProjectMeta(proj);
+                  const {pos:projPos, progress:projProg, startDate:projStart, endDate:projEnd}=getProjectMeta(proj);
                   const catColor=CATEGORY_COLORS[proj.category];
+
+                  // 접힌 프로젝트 행 높이 (minHeight style과 실제 렌더 통일)
+                  const collapsedMinH = calcCollapsedMinH(proj);
+
                   return (
                     <React.Fragment key={proj.id}>
                       {/* Project row */}
@@ -1147,22 +1677,20 @@ function GanttChart({ user, onLogout }: { user: any; onLogout: () => void }) {
                         <div style={{width:SUB_COL,minWidth:SUB_COL,flexShrink:0,display:'flex',alignItems:'flex-start',justifyContent:'center',padding:'12px 4px',borderRight:'1px solid #e5e7eb',fontSize:12,color:'#6b7280',textAlign:'center',wordBreak:'break-all',position:'sticky',left:LEFT_COL+ASSIGNEE_COL,zIndex:8,background:'inherit'}}>
                           {proj.subOwner||<span style={{color:'#d1d5db'}}>-</span>}
                         </div>
+                        {/* ── 프로젝트 타임라인 셀 ── */}
                         <div style={{width:TIMELINE_W,minWidth:TIMELINE_W,flexShrink:0,position:'relative',display:'flex',alignItems:'center',
-                          minHeight: (() => {
-                            if (proj.expanded || proj.tasks.length === 0) return 52;
-                            const lanes = assignLanes(proj.tasks.filter((t:any)=>t.startDate&&t.endDate));
-                            const laneCount = Math.max(1, lanes.length > 0 ? Math.max(...lanes.map((l:any)=>l.lane)) + 1 : 1);
-                            return Math.max(52, laneCount * 26 + 12);
-                          })()
+                          minHeight: proj.expanded || proj.tasks.length === 0 ? 52 : collapsedMinH
                         }}>
-                          {V_MONTHS.map((_,i)=><div key={i} style={{width:MONTH_COL,height:'100%',position:'absolute',left:i*MONTH_COL,top:0,borderRight:i<V_MONTHS.length-1?'1px solid #f3f4f6':'none'}} />)}
+                          {GridLines}
                           {todayLeft!==null && <div style={{position:'absolute',left:todayLeft,top:0,bottom:0,width:2,background:'#ef4444',opacity:0.7,zIndex:5}} />}
+
+                          {/* Task 없을 때: 프로젝트 자체 기간바 (드래그 가능) */}
                           {projPos && proj.tasks.length===0 && (()=>{
                             const isProjDrag=dragging?.pid===proj.id && dragging?.tid==='__proj__';
                             return (
                               <div style={{position:'absolute',left:projPos.left,width:projPos.width,height:22,top:'50%',transform:'translateY(-50%)',background:catColor?catColor.bg:c.barLight,borderRadius:4,overflow:'visible',border:`1px solid ${catColor?catColor.border:c.bar}55`,zIndex:6,cursor:'grab'}}
                                 onMouseDown={e=>handleMouseDown(e,proj.id,'__proj__','move')}
-                                onMouseEnter={e=>{setTooltip({startDate:proj.startDate,endDate:proj.endDate});setTooltipPos({x:e.clientX,y:e.clientY});}}
+                                onMouseEnter={e=>{setTooltip({name:proj.name,startDate:projStart,endDate:projEnd});setTooltipPos({x:e.clientX,y:e.clientY});}}
                                 onMouseMove={e=>setTooltipPos({x:e.clientX,y:e.clientY})}
                                 onMouseLeave={()=>{if(!isProjDrag)setTooltip(null);}}>
                                 <div style={{position:'absolute',left:0,top:0,bottom:0,width:8,cursor:'ew-resize',zIndex:8,borderRadius:'4px 0 0 4px'}} onMouseDown={e=>handleMouseDown(e,proj.id,'__proj__','start')} />
@@ -1175,30 +1703,40 @@ function GanttChart({ user, onLogout }: { user: any; onLogout: () => void }) {
                               </div>
                             );
                           })()}
-                          {proj.tasks.length>0 && proj.expanded && projPos && (
-                            <div style={{position:'absolute',left:projPos.left,width:projPos.width,height:22,top:'50%',transform:'translateY(-50%)',background:catColor?catColor.bg:c.barLight,borderRadius:4,overflow:'hidden',border:`1px solid ${catColor?catColor.border:c.bar}55`,zIndex:6}}>
-                              <div style={{width:`${projProg}%`,height:'100%',background:catColor?catColor.border:c.bar,borderRadius:4}} />
-                              {projPos.width>40
-                                ? <div style={{position:'absolute',inset:0,display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,color:'#1f2937',fontWeight:700}}>{projProg}%</div>
-                                : <div style={{position:'absolute',left:projPos.width+5,top:'50%',transform:'translateY(-50%)',whiteSpace:'nowrap',fontSize:11,color:'#374151',fontWeight:600}}>{projProg}%</div>
-                              }
-                            </div>
-                          )}
+
+                          {/* Task 있고 펼침: 프로젝트 전체 범위를 얇은 배경바로 표시 (읽기 전용) */}
+                          {proj.tasks.length>0 && proj.expanded && projPos && (()=>{
+                            const isProjDrag=dragging?.pid===proj.id && dragging?.tid==='__proj__';
+                            return (
+                              <div style={{position:'absolute',left:projPos.left,width:projPos.width,height:22,top:'50%',transform:'translateY(-50%)',background:catColor?catColor.bg:c.barLight,borderRadius:4,overflow:'hidden',border:`1px solid ${catColor?catColor.border:c.bar}55`,zIndex:6,cursor:'default'}}
+                                onMouseEnter={e=>{setTooltip({name:proj.name,startDate:projStart,endDate:projEnd});setTooltipPos({x:e.clientX,y:e.clientY});}}
+                                onMouseMove={e=>setTooltipPos({x:e.clientX,y:e.clientY})}
+                                onMouseLeave={()=>{if(!isProjDrag)setTooltip(null);}}>
+                                <div style={{width:`${projProg}%`,height:'100%',background:catColor?catColor.border:c.bar,borderRadius:4}} />
+                                {projPos.width>40
+                                  ? <div style={{position:'absolute',inset:0,display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,color:'#1f2937',fontWeight:700,pointerEvents:'none'}}>{projProg}%</div>
+                                  : <div style={{position:'absolute',left:projPos.width+5,top:'50%',transform:'translateY(-50%)',whiteSpace:'nowrap',fontSize:11,color:'#374151',fontWeight:600,pointerEvents:'none'}}>{projProg}%</div>
+                                }
+                              </div>
+                            );
+                          })()}
+
+                          {/* Task 있고 접힘: 태스크바를 레인 패킹으로 표시 */}
                           {proj.tasks.length>0 && !proj.expanded && (()=>{
-                            const validTasks = proj.tasks.filter((t:any)=>t.startDate&&t.endDate);
+                            const validTasks = proj.tasks.filter((t:any) => t.startDate && t.endDate);
                             const laned = assignLanes(validTasks);
-                            const laneCount = laned.length > 0 ? Math.max(...laned.map((l:any)=>l.lane)) + 1 : 1;
-                            const ROW_H = 20;
-                            const GAP = 4;
-                            const totalH = laneCount * (ROW_H + GAP) - GAP;
-                            const containerH = Math.max(52, totalH + 12);
-                            return laned.map(({task, lane, pos: tpos}:any) => {
+                            const laneCount = calcLaneCount(laned);
+                            const totalH = laneCount * (TASK_ROW_H + TASK_GAP) - TASK_GAP;
+                            const containerH = collapsedMinH; // style minHeight와 동일한 값 사용
+                            const topBase = (containerH - totalH) / 2;
+
+                            return laned.map(({task, lane, pos: tpos}) => {
                               if (!tpos) return null;
                               const taskCatColor = CATEGORY_COLORS[task.category];
                               const tc = COLOR_MAP[proj.color] || COLOR_MAP.blue;
                               const barBg = taskCatColor ? taskCatColor.border : tc.bar;
                               const barBgLight = taskCatColor ? taskCatColor.bg : tc.barLight;
-                              const topOffset = (containerH - totalH) / 2 + lane * (ROW_H + GAP);
+                              const topOffset = topBase + lane * (TASK_ROW_H + TASK_GAP);
                               const isDrag = dragging?.pid===proj.id && dragging?.tid===task.id;
                               return (
                                 <div key={task.id}
@@ -1206,8 +1744,7 @@ function GanttChart({ user, onLogout }: { user: any; onLogout: () => void }) {
                                   onMouseMove={e=>setTooltipPos({x:e.clientX,y:e.clientY})}
                                   onMouseLeave={()=>{if(!isDrag)setTooltip(null);}}
                                   onMouseDown={e=>handleMouseDown(e,proj.id,task.id,'move')}
-                                  style={{position:'absolute',left:tpos.left,width:tpos.width,height:ROW_H,top:topOffset,background:barBgLight,borderRadius:3,zIndex:6,cursor:'grab',display:'flex',alignItems:'center',overflow:'visible',minWidth:4,border:`1px solid ${barBg}55`,boxShadow:`0 1px 3px ${barBg}33`}}>
-                                  {/* 왼쪽 리사이즈 핸들 */}
+                                  style={{position:'absolute',left:tpos.left,width:tpos.width,height:TASK_ROW_H,top:topOffset,background:barBgLight,borderRadius:3,zIndex:6,cursor:'grab',display:'flex',alignItems:'center',overflow:'visible',minWidth:4,border:`1px solid ${barBg}55`,boxShadow:`0 1px 3px ${barBg}33`}}>
                                   <div onMouseDown={e=>handleMouseDown(e,proj.id,task.id,'start')}
                                     style={{position:'absolute',left:0,top:0,bottom:0,width:6,cursor:'ew-resize',zIndex:8,borderRadius:'3px 0 0 3px'}} />
                                   <div style={{width:`${task.progress||0}%`,height:'100%',background:barBg,borderRadius:3,opacity:0.7,pointerEvents:'none'}} />
@@ -1216,7 +1753,6 @@ function GanttChart({ user, onLogout }: { user: any; onLogout: () => void }) {
                                       {task.name}
                                     </span>
                                   )}
-                                  {/* 오른쪽 리사이즈 핸들 */}
                                   <div onMouseDown={e=>handleMouseDown(e,proj.id,task.id,'end')}
                                     style={{position:'absolute',right:0,top:0,bottom:0,width:6,cursor:'ew-resize',zIndex:8,borderRadius:'0 3px 3px 0'}} />
                                 </div>
@@ -1226,7 +1762,7 @@ function GanttChart({ user, onLogout }: { user: any; onLogout: () => void }) {
                         </div>
                       </div>
 
-                      {/* Task rows */}
+                      {/* Task rows (펼침) */}
                       {proj.expanded && proj.tasks.map((task:any)=>{
                         const pos=getPos(task.startDate,task.endDate);
                         const isDrag=dragging?.pid===proj.id && dragging?.tid===task.id;
@@ -1261,12 +1797,12 @@ function GanttChart({ user, onLogout }: { user: any; onLogout: () => void }) {
                               {task.subAssignee||<span style={{color:'#d1d5db'}}>-</span>}
                             </div>
                             <div style={{width:TIMELINE_W,minWidth:TIMELINE_W,flexShrink:0,position:'relative',minHeight:46,display:'flex',alignItems:'center'}}>
-                              {V_MONTHS.map((_,i)=><div key={i} style={{width:MONTH_COL,height:'100%',position:'absolute',left:i*MONTH_COL,top:0,borderRight:i<V_MONTHS.length-1?'1px solid #f3f4f6':'none'}} />)}
+                              {GridLines}
                               {todayLeft!==null && <div style={{position:'absolute',left:todayLeft,top:0,bottom:0,width:2,background:'#ef4444',opacity:0.4,zIndex:5}} />}
                               {pos && (
                                 <div style={{position:'absolute',left:pos.left,width:pos.width,height:26,top:'50%',transform:'translateY(-50%)',background:catColor?catColor.bg:c.barLight,borderRadius:5,border:`1px solid ${catColor?catColor.border:c.bar}55`,cursor:'grab',zIndex:6,overflow:'visible'}}
                                   onMouseDown={e=>handleMouseDown(e,proj.id,task.id,'move')}
-                                  onMouseEnter={e=>{setTooltip({startDate:task.startDate,endDate:task.endDate});setTooltipPos({x:e.clientX,y:e.clientY});}}
+                                  onMouseEnter={e=>{setTooltip({name:task.name,startDate:task.startDate,endDate:task.endDate});setTooltipPos({x:e.clientX,y:e.clientY});}}
                                   onMouseMove={e=>setTooltipPos({x:e.clientX,y:e.clientY})}
                                   onMouseLeave={()=>{if(!isDrag)setTooltip(null);}}>
                                   <div style={{position:'absolute',left:0,top:0,bottom:0,width:8,cursor:'ew-resize',zIndex:8,borderRadius:'5px 0 0 5px'}} onMouseDown={e=>handleMouseDown(e,proj.id,task.id,'start')} />
@@ -1293,9 +1829,14 @@ function GanttChart({ user, onLogout }: { user: any; onLogout: () => void }) {
 
       {/* 툴팁 */}
       {tooltip?.startDate && (
-        <div style={{position:'fixed',left:tooltipPos.x+12,top:tooltipPos.y+12,background:'#1f2937',color:'white',fontSize:11,padding:'6px 10px',borderRadius:6,whiteSpace:'nowrap',pointerEvents:'none',zIndex:99999,boxShadow:'0 2px 8px rgba(0,0,0,0.3)',lineHeight:1.6}}>
-          {tooltip.name && <div style={{fontWeight:600,marginBottom:2,color:'#e2e8f0'}}>{tooltip.name}</div>}
-          <div style={{color:'rgba(148,163,184,0.9)'}}>{tooltip.startDate} ~ {tooltip.endDate}</div>
+        <div style={{position:'fixed',left:tooltipPos.x+14,top:tooltipPos.y-8,background:'#111827',color:'white',fontSize:13,padding:'10px 14px',borderRadius:8,whiteSpace:'nowrap',pointerEvents:'none',zIndex:99999,boxShadow:'0 4px 16px rgba(0,0,0,0.45)',lineHeight:1.7,border:'1px solid rgba(255,255,255,0.08)'}}>
+          {tooltip.name && <div style={{fontWeight:700,marginBottom:4,color:'#f1f5f9',fontSize:14}}>{tooltip.name}</div>}
+          <div style={{display:'flex',alignItems:'center',gap:6}}>
+            <span style={{color:'#6ee7b7',fontWeight:600,fontSize:13}}>▶</span>
+            <span style={{color:'#ffffff',fontWeight:600,letterSpacing:'0.3px'}}>{tooltip.startDate}</span>
+            <span style={{color:'#9ca3af',fontSize:12,margin:'0 2px'}}>→</span>
+            <span style={{color:'#ffffff',fontWeight:600,letterSpacing:'0.3px'}}>{tooltip.endDate}</span>
+          </div>
         </div>
       )}
 
