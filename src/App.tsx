@@ -51,39 +51,39 @@ const KR_HOLIDAYS_2026: Record<string, string> = {
 };
 
 // ── 기기/화면 분류 ────────────────────────────────────────────
-// 터치 디바이스 여부
+// 터치 디바이스 여부 (실기기 기준)
 const isTouchDevice = () => 'ontouchstart' in window || navigator.maxTouchPoints > 0;
 
-// 실제 디바이스 종류 판별
 type DeviceType = 'phone' | 'tablet' | 'fold' | 'desktop';
 
 const classifyDevice = (w: number, h: number): DeviceType => {
-  const touch = isTouchDevice();
-  if (!touch) return 'desktop';
+  // 비터치(마우스) = 데스크탑
+  if (!isTouchDevice()) return 'desktop';
+  // short/long 은 항상 가로세로 방향 무관한 실제 물리 짧은 변
   const short = Math.min(w, h);
-  const long  = Math.max(w, h);
-  // 갤럭시 폴드: 접혔을 때 short~344px 이하, 펼쳤을 때 short~717px
-  // 일반 폰: short 보통 360–430px / long 700–932px
-  // 태블릿: short 600px↑
-  if (short >= 600) return 'tablet';           // 태블릿 (iPad, Galaxy Tab, Fold 펼침)
-  if (short < 350) return 'fold';              // 갤럭시 폴드 접힘
-  return 'phone';                              // 일반 폰
+  // 갤럭시 폴드 접힘: short ≈ 280~344px  (Z Fold6 접힘 short=344)
+  if (short <= 344) return 'fold';
+  // 태블릿 / 폴드 펼침: short ≥ 600px
+  if (short >= 600) return 'tablet';
+  // 일반 폰: short 345~599px  (Galaxy S/A, iPhone 모두 해당)
+  return 'phone';
 };
 
 // 간트 뷰 표시 여부
-// - 데스크탑: 항상 간트
-// - 태블릿 가로/폴드펼침 가로: 간트
-// - 태블릿 세로: 카드
-// - 폰 가로(landscape): 간트 (헤더 compact)
-// - 폰 세로 / 폴드 접힘: 카드
+// ┌──────────────────┬──────┬──────┐
+// │ 기기             │ 세로 │ 가로 │
+// ├──────────────────┼──────┼──────┤
+// │ 데스크탑         │ 간트 │ 간트 │
+// │ 태블릿/폴드펼침  │ 카드 │ 간트 │
+// │ 일반폰           │ 카드 │ 간트 │
+// │ 폴드접힘         │ 카드 │ 카드 │
+// └──────────────────┴──────┴──────┘
 const shouldShowGantt = (w: number, h: number): boolean => {
   const device = classifyDevice(w, h);
-  const isLandscape = w > h;
   if (device === 'desktop') return true;
-  if (device === 'tablet')  return isLandscape;
-  if (device === 'fold')    return false;         // 폴드 접힘 항상 카드
-  // phone: 가로만 간트
-  return isLandscape;
+  if (device === 'fold')    return false;   // 폴드 접힘은 세로/가로 모두 카드
+  // phone / tablet: 가로(landscape)일 때만 간트
+  return w > h;
 };
 
 const calcLayout = (mode: ViewMode, screenW: number) => {
@@ -345,17 +345,21 @@ function GanttChart({ user, appId, onAppChange, onLogout }: { user: any; appId: 
   const [screenH, setScreenH] = useState(window.innerHeight);
 
   useEffect(() => {
-    const onResize = () => {
+    const updateSize = () => {
       setScreenW(window.innerWidth);
       setScreenH(window.innerHeight);
     };
-    window.addEventListener('resize', onResize);
-    // orientation change 도 잡기
-    window.addEventListener('orientationchange', () => {
-      setTimeout(() => { setScreenW(window.innerWidth); setScreenH(window.innerHeight); }, 150);
-    });
+    // orientationchange: iOS/Android 모두 안정적으로 잡기
+    const onOrient = () => {
+      // 100ms + 350ms 두 번 — iOS는 늦게 확정됨
+      setTimeout(updateSize, 100);
+      setTimeout(updateSize, 350);
+    };
+    window.addEventListener('resize', updateSize);
+    window.addEventListener('orientationchange', onOrient);
     return () => {
-      window.removeEventListener('resize', onResize);
+      window.removeEventListener('resize', updateSize);
+      window.removeEventListener('orientationchange', onOrient);
     };
   }, []);
 
@@ -968,10 +972,7 @@ function GanttChart({ user, appId, onAppChange, onLogout }: { user: any; appId: 
                   </button>
                 ))}
               </div>
-              {/* 기기 타입 표시 (디버깅 겸 UX) */}
-              <span style={{fontSize:10,color:'rgba(148,163,184,0.35)',userSelect:'none'}}>
-                {deviceType==='tablet'?'📱태블릿':deviceType==='fold'?'📱폴드':'📱폰'} {isPortrait?'세로':'가로'}
-              </span>
+
             </div>
             <div style={{display:'flex',alignItems:'center',gap:6}}>
               {saving && <div style={{display:'flex',alignItems:'center',gap:4,fontSize:10,color:'#4ade80'}}><div style={{width:8,height:8,border:'2px solid #4ade80',borderTopColor:'transparent',borderRadius:'50%',animation:'spin 0.8s linear infinite'}}/>저장중</div>}
