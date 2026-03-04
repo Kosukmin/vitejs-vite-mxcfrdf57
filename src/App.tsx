@@ -11,6 +11,81 @@ type ViewMode = 'year'|'half'|'week'|'day';
 const WEEK_COL_W = 52;
 const DAY_COL_W  = 28;
 
+// ── 2026년 대한민국 법정공휴일 + 대체공휴일 ────────────────────
+// 설날: 음력 1/1 = 양력 2/17(화)  연휴: 2/16(월)~2/18(수)
+// 3·1절: 3/1(일) → 대체 3/2(월)
+// 부처님오신날: 음력 4/8 = 5/24(일) → 대체 5/25(월)
+// 광복절: 8/15(토) → 대체 8/17(월)
+// 추석: 음력 8/15 = 10/1(목)  연휴: 9/30(수)~10/2(금)
+// 개천절: 10/3(토) → 대체 10/5(월)
+const KR_HOLIDAYS_2026: Record<string, string> = {
+  '2026-01-01': '신정',
+  // 설날 연휴
+  '2026-02-16': '설날 전날',
+  '2026-02-17': '설날',
+  '2026-02-18': '설날 다음날',
+  // 3·1절 + 대체공휴일
+  '2026-03-01': '3·1절',
+  '2026-03-02': '3·1절 대체공휴일',
+  // 어린이날
+  '2026-05-05': '어린이날',
+  // 부처님오신날 + 대체공휴일
+  '2026-05-24': '부처님오신날',
+  '2026-05-25': '부처님오신날 대체공휴일',
+  // 현충일
+  '2026-06-06': '현충일',
+  // 광복절 + 대체공휴일
+  '2026-08-15': '광복절',
+  '2026-08-17': '광복절 대체공휴일',
+  // 추석 연휴
+  '2026-09-30': '추석 전날',
+  '2026-10-01': '추석',
+  '2026-10-02': '추석 다음날',
+  // 개천절 + 대체공휴일
+  '2026-10-03': '개천절',
+  '2026-10-05': '개천절 대체공휴일',
+  // 한글날
+  '2026-10-09': '한글날',
+  // 크리스마스
+  '2026-12-25': '크리스마스',
+};
+
+// ── 기기/화면 분류 ────────────────────────────────────────────
+// 터치 디바이스 여부
+const isTouchDevice = () => 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+
+// 실제 디바이스 종류 판별
+type DeviceType = 'phone' | 'tablet' | 'fold' | 'desktop';
+
+const classifyDevice = (w: number, h: number): DeviceType => {
+  const touch = isTouchDevice();
+  if (!touch) return 'desktop';
+  const short = Math.min(w, h);
+  const long  = Math.max(w, h);
+  // 갤럭시 폴드: 접혔을 때 short~344px 이하, 펼쳤을 때 short~717px
+  // 일반 폰: short 보통 360–430px / long 700–932px
+  // 태블릿: short 600px↑
+  if (short >= 600) return 'tablet';           // 태블릿 (iPad, Galaxy Tab, Fold 펼침)
+  if (short < 350) return 'fold';              // 갤럭시 폴드 접힘
+  return 'phone';                              // 일반 폰
+};
+
+// 간트 데스크탑 뷰를 보여줄지 여부
+// - 데스크탑: 항상 간트
+// - 태블릿 가로: 간트
+// - 태블릿 세로: 카드
+// - 폰 / 폴드 접힘 가로세로: 카드
+// - 폴드 펼침(short>=600): 가로 → 간트, 세로 → 카드
+const shouldShowGantt = (w: number, h: number): boolean => {
+  const device = classifyDevice(w, h);
+  const isLandscape = w > h;
+  if (device === 'desktop') return true;
+  if (device === 'tablet')  return isLandscape;  // 태블릿 가로만 간트
+  if (device === 'fold')    return false;         // 폴드 접힘 항상 카드
+  // phone
+  return false;                                  // 폰 항상 카드
+};
+
 const calcLayout = (mode: ViewMode, screenW: number) => {
   const leftCol     = Math.max(260, Math.floor(screenW * 0.30));
   const assigneeCol = Math.max(56,  Math.floor(screenW * 0.06));
@@ -53,11 +128,25 @@ const WEEK_HEADERS = (() => {
 })();
 
 const DAY_HEADERS = (() => {
-  const items: { day: number; month: number; isFirst: boolean }[] = [];
+  const items: { day: number; month: number; isFirst: boolean; dateStr: string; isHoliday: boolean; holidayName: string; isSunday: boolean; isSaturday: boolean }[] = [];
   const base = new Date('2026-01-01T00:00:00');
   for (let i = 0; i < 365; i++) {
     const d = new Date(base); d.setDate(d.getDate() + i);
-    items.push({ day: d.getDate(), month: d.getMonth()+1, isFirst: d.getDate()===1 });
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    const dateStr = `${y}-${m}-${day}`;
+    const dow = d.getDay();
+    items.push({
+      day: d.getDate(),
+      month: d.getMonth() + 1,
+      isFirst: d.getDate() === 1,
+      dateStr,
+      isHoliday: !!KR_HOLIDAYS_2026[dateStr],
+      holidayName: KR_HOLIDAYS_2026[dateStr] || '',
+      isSunday: dow === 0,
+      isSaturday: dow === 6,
+    });
   }
   return items;
 })();
@@ -256,10 +345,24 @@ function GanttChart({ user, appId, onAppChange, onLogout }: { user: any; appId: 
   const [screenH, setScreenH] = useState(window.innerHeight);
 
   useEffect(() => {
-    const onResize = () => { setScreenW(window.innerWidth); setScreenH(window.innerHeight); };
+    const onResize = () => {
+      setScreenW(window.innerWidth);
+      setScreenH(window.innerHeight);
+    };
     window.addEventListener('resize', onResize);
-    return () => window.removeEventListener('resize', onResize);
+    // orientation change 도 잡기
+    window.addEventListener('orientationchange', () => {
+      setTimeout(() => { setScreenW(window.innerWidth); setScreenH(window.innerHeight); }, 150);
+    });
+    return () => {
+      window.removeEventListener('resize', onResize);
+    };
   }, []);
+
+  // ── 뷰 모드 결정 ──────────────────────────────────────────────
+  const showGantt = shouldShowGantt(screenW, screenH);
+  const deviceType = classifyDevice(screenW, screenH);
+  const isPortrait = screenH > screenW;
 
   const layout       = React.useMemo(() => calcLayout(viewMode, screenW), [viewMode, screenW]);
   const LEFT_COL     = layout.leftCol;
@@ -269,13 +372,38 @@ function GanttChart({ user, appId, onAppChange, onLogout }: { user: any; appId: 
   const TIMELINE_W   = layout.totalTimelineW;
 
   const gridColCount = viewMode === 'day' ? 365 : viewMode === 'week' ? 52 : 12;
-  const GridLines = (
-    <div style={{position:'absolute',inset:0,display:'flex',pointerEvents:'none',zIndex:0}}>
-      {Array.from({length: gridColCount}, (_,i) => (
-        <div key={i} style={{width:MONTH_COL,minWidth:MONTH_COL,flexShrink:0,height:'100%',borderRight:i<gridColCount-1?'1px solid #e8ecf8':'none'}} />
-      ))}
+  // GridLines: CSS repeating-linear-gradient 단일 div — useMemo로 MONTH_COL 변경 시만 재계산
+  const GridLines = React.useMemo(() => (
+    <div style={{
+      position:'absolute',inset:0,pointerEvents:'none',zIndex:0,
+      backgroundImage:`repeating-linear-gradient(to right, transparent 0px, transparent ${MONTH_COL-1}px, #e8ecf8 ${MONTH_COL-1}px, #e8ecf8 ${MONTH_COL}px)`,
+      backgroundSize:`${MONTH_COL}px 100%`,
+    }} />
+  ), [MONTH_COL]);
+
+  // ── 일 뷰: 공휴일/주말 배경 오버레이 ─────────────────────────
+  // DayOverlayLines: 공휴일/주말/토요일 열만 absolute div로 렌더 — 전체 365개 대신 특수일만
+  const DayOverlayLines = viewMode === 'day' ? (
+    <div style={{position:'absolute',inset:0,pointerEvents:'none',zIndex:1,overflow:'hidden'}}>
+      {DAY_HEADERS.map((h, i) => {
+        if (!h.isHoliday && !h.isSunday && !h.isSaturday) return null;
+        const bg = h.isHoliday
+          ? 'rgba(220,38,38,0.10)'
+          : h.isSunday
+            ? 'rgba(239,68,68,0.06)'
+            : 'rgba(37,99,235,0.05)';
+        const borderLeft = h.isHoliday ? '1px solid rgba(220,38,38,0.18)' : undefined;
+        return (
+          <div key={i} style={{
+            position:'absolute', top:0, bottom:0,
+            left: i * DAY_COL_W, width: DAY_COL_W,
+            background: bg,
+            borderLeft,
+          }} />
+        );
+      })}
     </div>
-  );
+  ) : null;
 
   const V_START      = new Date('2026-01-01T00:00:00');
   const V_END        = new Date('2026-12-31T00:00:00');
@@ -315,16 +443,13 @@ function GanttChart({ user, appId, onAppChange, onLogout }: { user: any; appId: 
   const toastTimer   = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastScrollY  = useRef(0);
   const mobileScrollRef = useRef<HTMLDivElement>(null);
+  const chartScrollRef  = useRef<HTMLDivElement>(null);
+  const tooltipTimer    = useRef<ReturnType<typeof setTimeout> | null>(null);
   const HISTORY_DEBOUNCE_MS = 5 * 60 * 1000;
 
   useEffect(() => { draggingRef.current = dragging; }, [dragging]);
 
-  const isPortrait = screenH > screenW;
-
-  // ── [FIX] 모바일 판별: 터치 디바이스 기반 (아이폰 15 Pro Max 가로 932px 정확히 대응)
-  const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
-  const isMobile = isTouchDevice && (isPortrait ? screenW < 1200 : screenH < 600);
-
+  // 가로모드 전환 시 headerCollapsed 리셋
   useEffect(() => { if (isPortrait) setHeaderCollapsed(false); }, [isPortrait]);
 
   useEffect(() => {
@@ -372,7 +497,7 @@ function GanttChart({ user, appId, onAppChange, onLogout }: { user: any; appId: 
     return { pos: getPos(realStart, realEnd), progress: totalW > 0 ? Math.round(totalP / totalW) : 0, startDate: realStart, endDate: realEnd };
   }, [getPos]);
 
-  const TASK_ROW_H = 20;
+  const TASK_ROW_H = 22;
   const TASK_GAP   = 4;
   const BAR_GAP_PX = 4;
 
@@ -781,10 +906,10 @@ function GanttChart({ user, appId, onAppChange, onLogout }: { user: any; appId: 
 
   const totalW = LEFT_COL + ASSIGNEE_COL + SUB_COL + TIMELINE_W;
 
-  // ────────────────────────────────────────────
-  // 모바일 뷰 (카드형)
-  // ────────────────────────────────────────────
-  if (isMobile) {
+  // ────────────────────────────────────────────────────────────
+  // 모바일 / 태블릿 세로 → 카드형 뷰
+  // ────────────────────────────────────────────────────────────
+  if (!showGantt) {
     const getMiniPos = (s: string, e: string) => {
       if (!s || !e) return null;
       const sd = parseDate(s), ed = parseDate(e);
@@ -800,8 +925,10 @@ function GanttChart({ user, appId, onAppChange, onLogout }: { user: any; appId: 
       return (t.getTime() - V_START.getTime()) / (V_END.getTime() - V_START.getTime()) * 100;
     })();
 
+    // 태블릿 세로는 좀 더 넓은 레이아웃
+    const isTabletPortrait = deviceType === 'tablet' && isPortrait;
+
     return (
-      // ── [FIX] height: 100dvh, overflow-x 차단, safe-area 대응
       <div style={{height:'100dvh',width:'100%',maxWidth:'100vw',display:'flex',flexDirection:'column',background:'#0f0f1a',fontFamily:"'Pretendard',-apple-system,BlinkMacSystemFont,sans-serif",overflow:'hidden',boxSizing:'border-box'}}>
         <style>{`
           @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
@@ -814,7 +941,7 @@ function GanttChart({ user, appId, onAppChange, onLogout }: { user: any; appId: 
           .hdr-collapsible{ overflow:hidden; transition:max-height 0.3s cubic-bezier(0.4,0,0.2,1), opacity 0.25s ease; }
         `}</style>
 
-        {/* ── 모바일 헤더 (safe-area padding 적용) ── */}
+        {/* 헤더 */}
         <div style={{
           background:'linear-gradient(135deg,#0f0f1a,#1a1a2e,#16213e)',
           borderBottom:'1px solid rgba(255,255,255,0.08)',
@@ -826,7 +953,6 @@ function GanttChart({ user, appId, onAppChange, onLogout }: { user: any; appId: 
           paddingRight: 'max(14px, env(safe-area-inset-right))',
           transition:'padding 0.28s ease',
         }}>
-          {/* 상단 바: 앱 전환 + 저장/토스트 + 로그아웃 */}
           <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:(!isPortrait&&headerCollapsed)?0:8,transition:'margin-bottom 0.28s ease'}}>
             <div style={{display:'flex',alignItems:'center',gap:8}}>
               <div style={{display:'flex',background:'rgba(255,255,255,0.07)',borderRadius:9,padding:3,border:'1px solid rgba(255,255,255,0.1)',gap:2}}>
@@ -840,11 +966,10 @@ function GanttChart({ user, appId, onAppChange, onLogout }: { user: any; appId: 
                   </button>
                 ))}
               </div>
-              {!isPortrait && headerCollapsed && activeCategories.length > 0 && (
-                <div style={{display:'flex',gap:4,alignItems:'center'}}>
-                  {activeCategories.map(cat=>{ const cc=CATEGORY_COLORS[cat]; return <span key={cat} style={{fontSize:10,padding:'2px 7px',borderRadius:10,background:`${cc.bg}33`,color:cc.border,border:`1px solid ${cc.border}55`,fontWeight:600}}>{cat}</span>; })}
-                </div>
-              )}
+              {/* 기기 타입 표시 (디버깅 겸 UX) */}
+              <span style={{fontSize:10,color:'rgba(148,163,184,0.35)',userSelect:'none'}}>
+                {deviceType==='tablet'?'📱태블릿':deviceType==='fold'?'📱폴드':'📱폰'} {isPortrait?'세로':'가로'}
+              </span>
             </div>
             <div style={{display:'flex',alignItems:'center',gap:6}}>
               {saving && <div style={{display:'flex',alignItems:'center',gap:4,fontSize:10,color:'#4ade80'}}><div style={{width:8,height:8,border:'2px solid #4ade80',borderTopColor:'transparent',borderRadius:'50%',animation:'spin 0.8s linear infinite'}}/>저장중</div>}
@@ -853,7 +978,7 @@ function GanttChart({ user, appId, onAppChange, onLogout }: { user: any; appId: 
             </div>
           </div>
 
-          {/* 카테고리 필터 (가로 스크롤 다운 시 숨김) */}
+          {/* 카테고리 필터 */}
           <div className="hdr-collapsible" style={{maxHeight:(!isPortrait&&headerCollapsed)?'0px':'50px',opacity:(!isPortrait&&headerCollapsed)?0:1}}>
             <div className="ms" style={{display:'flex',gap:5,overflowX:'auto',paddingBottom:2}}>
               <button onClick={()=>setActiveCategories([])}
@@ -870,13 +995,13 @@ function GanttChart({ user, appId, onAppChange, onLogout }: { user: any; appId: 
           </div>
         </div>
 
-        {/* ── 스크롤 영역 (safe-area 좌우 패딩) ── */}
+        {/* 스크롤 영역 */}
         <div ref={mobileScrollRef} className="ms" style={{
           flex:1, overflowY:'auto', overflowX:'hidden',
           paddingTop: 10,
           paddingBottom: 90,
-          paddingLeft: 'max(12px, env(safe-area-inset-left))',
-          paddingRight: 'max(12px, env(safe-area-inset-right))',
+          paddingLeft: isTabletPortrait ? 'max(20px, env(safe-area-inset-left))' : 'max(12px, env(safe-area-inset-left))',
+          paddingRight: isTabletPortrait ? 'max(20px, env(safe-area-inset-right))' : 'max(12px, env(safe-area-inset-right))',
         }}>
           {groupedFiltered.length===0 ? (
             <div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'80px 0',color:'#475569',gap:10}}>
@@ -979,7 +1104,7 @@ function GanttChart({ user, appId, onAppChange, onLogout }: { user: any; appId: 
           ))}
         </div>
 
-        {/* FAB — safe-area bottom 대응 */}
+        {/* FAB */}
         <button onClick={addProject} style={{
           position:'fixed',
           bottom:'max(24px, calc(env(safe-area-inset-bottom) + 16px))',
@@ -998,9 +1123,18 @@ function GanttChart({ user, appId, onAppChange, onLogout }: { user: any; appId: 
     );
   }
 
-  // ────────────────────────────────────────────
-  // 데스크탑 뷰 (간트차트)
-  // ────────────────────────────────────────────
+  // ────────────────────────────────────────────────────────────
+  // 데스크탑 / 태블릿 가로 → 간트차트 뷰
+  // ────────────────────────────────────────────────────────────
+
+  // 일 뷰 헤더용 — 공휴일/주말 스타일
+  const getDayHeaderStyle = (h: typeof DAY_HEADERS[0]) => {
+    if (h.isHoliday || h.isSunday) return { color:'#ef4444', fontWeight: 500, bg:'#fff5f5' };
+    if (h.isSaturday) return { color:'#2563eb', fontWeight: 400, bg:'#eff6ff' };
+    if (h.isFirst)    return { color:'#1d4ed8', fontWeight: 600, bg:'#eff6ff' };
+    return { color:'#6b7280', fontWeight: 400, bg:'#f9fafb' };
+  };
+
   return (
     <div style={{height:'100dvh',width:'100%',background:'#eef0f5',display:'flex',flexDirection:'column',overflow:'hidden',fontFamily:"'Pretendard',-apple-system,BlinkMacSystemFont,sans-serif"}}>
       <style>{`
@@ -1008,6 +1142,8 @@ function GanttChart({ user, appId, onAppChange, onLogout }: { user: any; appId: 
         @keyframes spin{to{transform:rotate(360deg)}}
         @keyframes fadeInDown{from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:translateY(0)}}
         *{box-sizing:border-box; font-family:'Pretendard',-apple-system,BlinkMacSystemFont,sans-serif;}
+        .day-holiday-cell:hover .holiday-tooltip { opacity: 1 !important; }
+        .day-holiday-cell { overflow: visible !important; }
       `}</style>
 
       {/* Header */}
@@ -1045,7 +1181,24 @@ function GanttChart({ user, appId, onAppChange, onLogout }: { user: any; appId: 
             <div style={{display:'flex',alignItems:'center',background:'rgba(255,255,255,0.07)',borderRadius:8,border:'1px solid rgba(255,255,255,0.12)',padding:2,gap:2}}>
               <span style={{fontSize:10,color:'rgba(148,163,184,0.5)',padding:'0 4px',userSelect:'none'}}>🔍</span>
               {([['year','월','12개월 한화면'],['half','월↔','6개월씩 스크롤'],['week','주','주단위 스크롤'],['day','일','일단위 스크롤']] as const).map(([mode,label,title])=>(
-                <button key={mode} onClick={()=>setViewMode(mode as ViewMode)} title={title}
+                <button key={mode} onClick={()=>{
+                  const el = chartScrollRef.current;
+                  if (el) {
+                    // 현재 스크롤 비율(0~1) 저장 후 새 뷰에서 같은 비율로 복원
+                    const ratio = el.scrollLeft / (el.scrollWidth - el.clientWidth || 1);
+                    setViewMode(mode as ViewMode);
+                    requestAnimationFrame(() => {
+                      requestAnimationFrame(() => {
+                        if (chartScrollRef.current) {
+                          const newMax = chartScrollRef.current.scrollWidth - chartScrollRef.current.clientWidth;
+                          chartScrollRef.current.scrollLeft = ratio * newMax;
+                        }
+                      });
+                    });
+                  } else {
+                    setViewMode(mode as ViewMode);
+                  }
+                }} title={title}
                   style={{height:26,padding:'0 10px',borderRadius:6,border:'none',cursor:'pointer',fontSize:12,fontWeight:viewMode===mode?700:400,background:viewMode===mode?'rgba(99,102,241,0.9)':'transparent',color:viewMode===mode?'white':'rgba(148,163,184,0.8)',transition:'all 0.15s'}}>
                   {label}
                 </button>
@@ -1092,17 +1245,22 @@ function GanttChart({ user, appId, onAppChange, onLogout }: { user: any; appId: 
           <div style={{display:'flex',alignItems:'center',gap:12,flexWrap:'wrap'}}>
             <div style={{display:'flex',alignItems:'center',gap:5}}><div style={{width:10,height:10,borderRadius:'50%',background:'#f87171'}} /><span style={{fontSize:12,color:'#e2e8f0'}}>오늘</span></div>
             <div style={{display:'flex',alignItems:'center',gap:5}}><div style={{width:28,height:9,borderRadius:3,background:'linear-gradient(to right,#3b82f6 50%,#bfdbfe 50%)'}} /><span style={{fontSize:12,color:'#e2e8f0'}}>진행률</span></div>
+            {viewMode === 'day' && <>
+              <div style={{display:'flex',alignItems:'center',gap:5}}><div style={{width:12,height:12,background:'rgba(239,68,68,0.15)',borderRadius:2,border:'1px solid rgba(239,68,68,0.3)'}} /><span style={{fontSize:12,color:'#e2e8f0'}}>공휴일</span></div>
+              <div style={{display:'flex',alignItems:'center',gap:5}}><div style={{width:12,height:12,background:'rgba(59,130,246,0.1)',borderRadius:2,border:'1px solid rgba(59,130,246,0.2)'}} /><span style={{fontSize:12,color:'#e2e8f0'}}>토요일</span></div>
+            </>}
             <span style={{fontSize:12,color:'#94a3b8'}}>⠿ 드래그로 순서 변경 | 바 드래그로 일정 조정 | 그룹명 더블클릭 이름 변경</span>
           </div>
         </div>
       </div>
 
       {/* Chart */}
-      <div style={{overflowX:'auto',overflowY:'auto',flex:1}}>
+      <div ref={chartScrollRef} style={{overflowX:'auto',overflowY:'auto',flex:1}}>
         <div style={{minWidth:totalW}}>
           {/* Column Header */}
           {(viewMode === 'day' || viewMode === 'week') ? (
             <div style={{position:'sticky',top:0,zIndex:20,background:'white',borderBottom:'2px solid #e2e8f0',boxShadow:'0 1px 3px rgba(0,0,0,0.05)',width:totalW}}>
+              {/* 월 띠 */}
               <div style={{display:'flex',height:20,borderBottom:'1px solid #e8ecf8'}}>
                 <div style={{width:LEFT_COL+ASSIGNEE_COL+SUB_COL,minWidth:LEFT_COL+ASSIGNEE_COL+SUB_COL,flexShrink:0,background:'#f9fafb',borderRight:'1px solid #e5e7eb',position:'sticky',left:0,zIndex:10}} />
                 <div style={{display:'flex',width:TIMELINE_W,minWidth:TIMELINE_W,flexShrink:0,overflow:'hidden'}}>
@@ -1118,6 +1276,7 @@ function GanttChart({ user, appId, onAppChange, onLogout }: { user: any; appId: 
                   ))}
                 </div>
               </div>
+              {/* 주/일 행 */}
               <div style={{display:'flex',height:22}}>
                 <div style={{width:LEFT_COL,minWidth:LEFT_COL,flexShrink:0,padding:'0 16px',fontWeight:600,fontSize:13,color:'#374151',borderRight:'1px solid #e5e7eb',background:'#f9fafb',position:'sticky',left:0,zIndex:10,display:'flex',alignItems:'center'}}>프로젝트 / Task</div>
                 <div style={{width:ASSIGNEE_COL,minWidth:ASSIGNEE_COL,flexShrink:0,fontWeight:600,fontSize:12,color:'#374151',borderRight:'1px solid #e5e7eb',background:'#f9fafb',textAlign:'center',position:'sticky',left:LEFT_COL,zIndex:10,display:'flex',alignItems:'center',justifyContent:'center'}}>담당(정)</div>
@@ -1125,7 +1284,32 @@ function GanttChart({ user, appId, onAppChange, onLogout }: { user: any; appId: 
                 <div style={{display:'flex',width:TIMELINE_W,minWidth:TIMELINE_W,flexShrink:0,overflow:'hidden'}}>
                   {viewMode === 'week'
                     ? WEEK_HEADERS.map((h,i)=>(<div key={i} style={{width:MONTH_COL,minWidth:MONTH_COL,flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',fontSize:12,fontWeight:h.isFirstOfMonth?700:500,color:h.isFirstOfMonth?'#1d4ed8':'#4b5563',borderRight:'1px solid #e8ecf8',background:h.isFirstOfMonth?'#eff6ff':'#f9fafb'}}>{h.label}</div>))
-                    : DAY_HEADERS.map((h,i)=>(<div key={i} style={{width:MONTH_COL,minWidth:MONTH_COL,flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,fontWeight:h.isFirst?600:400,color:h.isFirst?'#1d4ed8':'#6b7280',borderRight:'1px solid #e8ecf8',background:h.isFirst?'#eff6ff':'#f9fafb'}}>{h.day}</div>))
+                    : DAY_HEADERS.map((h,i)=>{
+                        const st = getDayHeaderStyle(h);
+                        return (
+                          <div key={i}
+                            style={{
+                              width:MONTH_COL,minWidth:MONTH_COL,flexShrink:0,
+                              display:'flex',alignItems:'center',justifyContent:'center',
+                              fontSize:10,fontWeight:st.fontWeight,color:st.color,
+                              borderRight:'1px solid #e8ecf8',background:st.bg,
+                              position:'relative',
+                              cursor:h.isHoliday?'help':'default',
+                            }}
+                            onMouseEnter={h.isHoliday ? e => {
+                              if(tooltipTimer.current) clearTimeout(tooltipTimer.current);
+                              tooltipTimer.current = setTimeout(() => {
+                                setTooltip({ holidayOnly: true, name: h.holidayName });
+                                setTooltipPos({ x: e.clientX, y: e.clientY });
+                              }, 80);
+                            } : undefined}
+                            onMouseMove={h.isHoliday ? e => setTooltipPos({ x: e.clientX, y: e.clientY }) : undefined}
+                            onMouseLeave={h.isHoliday ? () => { if(tooltipTimer.current) clearTimeout(tooltipTimer.current); setTooltip(null); } : undefined}
+                          >
+                            {h.day}
+                          </div>
+                        );
+                      })
                   }
                 </div>
               </div>
@@ -1177,6 +1361,7 @@ function GanttChart({ user, appId, onAppChange, onLogout }: { user: any; appId: 
                     const laneCount=laneEnds.length||1; return Math.max(44,laneCount*(TASK_ROW_H+TASK_GAP)-TASK_GAP+12);
                   })()}}>
                     {GridLines}
+                    {DayOverlayLines}
                     {todayLeft!==null && <div style={{position:'absolute',left:todayLeft,top:0,bottom:0,width:2,background:'#ef4444',opacity:0.3,zIndex:5}} />}
                     {collapsedGroups.has(group.name) && (()=>{
                       const projBars = group.items.map((proj:any) => { const c=COLOR_MAP[proj.color]||COLOR_MAP.blue; const catColor=CATEGORY_COLORS[proj.category]; const barBg=catColor?catColor.border:c.bar; const tasks=proj.tasks.filter((t:any)=>t.startDate&&t.endDate); const startDate=tasks.length?tasks.map((t:any)=>t.startDate).sort()[0]:(proj.startDate||''); const endDate=tasks.length?tasks.map((t:any)=>t.endDate).sort().reverse()[0]:(proj.endDate||''); const pos=getPos(startDate,endDate); return {proj,startDate,endDate,pos,barBg}; });
@@ -1186,7 +1371,7 @@ function GanttChart({ user, appId, onAppChange, onLogout }: { user: any; appId: 
                       sorted.forEach(({item,origIdx})=>{const laneIdx=laneEnds.findIndex(end=>end+BAR_GAP_PX<=item.pos!.left);const lane=laneIdx===-1?laneEnds.length:laneIdx;laneEnds[lane]=item.pos!.left+item.pos!.width;laneMap[origIdx]=lane;});
                       const validLanes=Object.values(laneMap); const laneCount=validLanes.length>0?Math.max(...validLanes)+1:1; const totalH=laneCount*(TASK_ROW_H+TASK_GAP)-TASK_GAP; const containerH=Math.max(44,totalH+12); const topBase=(containerH-totalH)/2;
                       return projBars.map((item,origIdx)=>{ if(!item.pos)return null; const lane=laneMap[origIdx]??0; const topOffset=topBase+lane*(TASK_ROW_H+TASK_GAP);
-                        return (<div key={item.proj.id} onMouseEnter={e=>{setTooltip({startDate:item.startDate,endDate:item.endDate,name:item.proj.name});setTooltipPos({x:e.clientX,y:e.clientY});}} onMouseMove={e=>setTooltipPos({x:e.clientX,y:e.clientY})} onMouseLeave={()=>setTooltip(null)}
+                        return (<div key={item.proj.id} onMouseEnter={e=>{if(tooltipTimer.current)clearTimeout(tooltipTimer.current);tooltipTimer.current=setTimeout(()=>{setTooltip({startDate:item.startDate,endDate:item.endDate,name:item.proj.name});setTooltipPos({x:e.clientX,y:e.clientY});},80);}} onMouseMove={e=>setTooltipPos({x:e.clientX,y:e.clientY})} onMouseLeave={()=>{if(tooltipTimer.current)clearTimeout(tooltipTimer.current);setTooltip(null);}}
                           style={{position:'absolute',left:item.pos.left,width:item.pos.width,height:TASK_ROW_H,top:topOffset,background:item.barBg,borderRadius:4,opacity:0.9,zIndex:6,cursor:'default',display:'flex',alignItems:'center',overflow:'hidden',minWidth:4,border:`1px solid ${item.barBg}`,boxShadow:`0 1px 4px ${item.barBg}55`}}>
                           {item.pos.width>40&&<span style={{fontSize:11,color:'white',fontWeight:700,padding:'0 8px',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',lineHeight:1,textShadow:'0 1px 3px rgba(0,0,0,0.5)',maxWidth:item.pos.width-4}}>{item.proj.name}</span>}
                         </div>);
@@ -1225,10 +1410,11 @@ function GanttChart({ user, appId, onAppChange, onLogout }: { user: any; appId: 
                         <div style={{width:SUB_COL,minWidth:SUB_COL,flexShrink:0,display:'flex',alignItems:'flex-start',justifyContent:'center',padding:'12px 4px',borderRight:'1px solid #e5e7eb',fontSize:12,color:'#6b7280',textAlign:'center',wordBreak:'break-all',position:'sticky',left:LEFT_COL+ASSIGNEE_COL,zIndex:8,background:'inherit'}}>{proj.subOwner||<span style={{color:'#d1d5db'}}>-</span>}</div>
                         <div style={{width:TIMELINE_W,minWidth:TIMELINE_W,flexShrink:0,position:'relative',display:'flex',alignItems:'center',minHeight:proj.expanded||proj.tasks.length===0?52:collapsedMinH}}>
                           {GridLines}
+                          {DayOverlayLines}
                           {todayLeft!==null && <div style={{position:'absolute',left:todayLeft,top:0,bottom:0,width:2,background:'#ef4444',opacity:0.7,zIndex:5}} />}
                           {projPos && proj.tasks.length===0 && (()=>{const isProjDrag=dragging?.pid===proj.id&&dragging?.tid==='__proj__'; return (
                             <div style={{position:'absolute',left:projPos.left,width:projPos.width,height:22,top:'50%',transform:'translateY(-50%)',background:catColor?catColor.bg:c.barLight,borderRadius:4,overflow:'visible',border:`1px solid ${catColor?catColor.border:c.bar}55`,zIndex:6,cursor:'grab'}}
-                              onMouseDown={e=>handleMouseDown(e,proj.id,'__proj__','move')} onMouseEnter={e=>{setTooltip({name:proj.name,startDate:projStart,endDate:projEnd});setTooltipPos({x:e.clientX,y:e.clientY});}} onMouseMove={e=>setTooltipPos({x:e.clientX,y:e.clientY})} onMouseLeave={()=>{if(!isProjDrag)setTooltip(null);}}>
+                              onMouseDown={e=>handleMouseDown(e,proj.id,'__proj__','move')} onMouseEnter={e=>{if(tooltipTimer.current)clearTimeout(tooltipTimer.current);tooltipTimer.current=setTimeout(()=>{setTooltip({name:proj.name,startDate:projStart,endDate:projEnd});setTooltipPos({x:e.clientX,y:e.clientY});},80);}} onMouseMove={e=>setTooltipPos({x:e.clientX,y:e.clientY})} onMouseLeave={()=>{if(tooltipTimer.current)clearTimeout(tooltipTimer.current);if(!isProjDrag)setTooltip(null);}}>
                               <div style={{position:'absolute',left:0,top:0,bottom:0,width:8,cursor:'ew-resize',zIndex:8,borderRadius:'4px 0 0 4px'}} onMouseDown={e=>handleMouseDown(e,proj.id,'__proj__','start')} />
                               <div style={{width:`${projProg}%`,height:'100%',background:catColor?catColor.border:c.bar,borderRadius:4,overflow:'hidden'}} />
                               {projPos.width>40?<div style={{position:'absolute',inset:0,display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,color:'#1f2937',fontWeight:700,pointerEvents:'none'}}>{projProg}%</div>:<div style={{position:'absolute',left:projPos.width+5,top:'50%',transform:'translateY(-50%)',whiteSpace:'nowrap',fontSize:11,color:'#374151',fontWeight:600,pointerEvents:'none'}}>{projProg}%</div>}
@@ -1237,7 +1423,7 @@ function GanttChart({ user, appId, onAppChange, onLogout }: { user: any; appId: 
                           })()}
                           {proj.tasks.length>0 && proj.expanded && projPos && (()=>{const isProjDrag=dragging?.pid===proj.id&&dragging?.tid==='__proj__'; return (
                             <div style={{position:'absolute',left:projPos.left,width:projPos.width,height:22,top:'50%',transform:'translateY(-50%)',background:catColor?catColor.bg:c.barLight,borderRadius:4,overflow:'hidden',border:`1px solid ${catColor?catColor.border:c.bar}55`,zIndex:6,cursor:'default'}}
-                              onMouseEnter={e=>{setTooltip({name:proj.name,startDate:projStart,endDate:projEnd});setTooltipPos({x:e.clientX,y:e.clientY});}} onMouseMove={e=>setTooltipPos({x:e.clientX,y:e.clientY})} onMouseLeave={()=>{if(!isProjDrag)setTooltip(null);}}>
+                              onMouseEnter={e=>{if(tooltipTimer.current)clearTimeout(tooltipTimer.current);tooltipTimer.current=setTimeout(()=>{setTooltip({name:proj.name,startDate:projStart,endDate:projEnd});setTooltipPos({x:e.clientX,y:e.clientY});},80);}} onMouseMove={e=>setTooltipPos({x:e.clientX,y:e.clientY})} onMouseLeave={()=>{if(tooltipTimer.current)clearTimeout(tooltipTimer.current);if(!isProjDrag)setTooltip(null);}}>
                               <div style={{width:`${projProg}%`,height:'100%',background:catColor?catColor.border:c.bar,borderRadius:4}} />
                               {projPos.width>40?<div style={{position:'absolute',inset:0,display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,color:'#1f2937',fontWeight:700,pointerEvents:'none'}}>{projProg}%</div>:<div style={{position:'absolute',left:projPos.width+5,top:'50%',transform:'translateY(-50%)',whiteSpace:'nowrap',fontSize:11,color:'#374151',fontWeight:600,pointerEvents:'none'}}>{projProg}%</div>}
                             </div>);
@@ -1245,7 +1431,7 @@ function GanttChart({ user, appId, onAppChange, onLogout }: { user: any; appId: 
                           {proj.tasks.length>0 && !proj.expanded && (()=>{
                             const validTasks=proj.tasks.filter((t:any)=>t.startDate&&t.endDate); const laned=assignLanes(validTasks); const laneCount=calcLaneCount(laned); const totalH=laneCount*(TASK_ROW_H+TASK_GAP)-TASK_GAP; const containerH=collapsedMinH; const topBase=(containerH-totalH)/2;
                             return laned.map(({task,lane,pos:tpos})=>{ if(!tpos)return null; const taskCatColor=CATEGORY_COLORS[task.category]; const tc=COLOR_MAP[proj.color]||COLOR_MAP.blue; const barBg=taskCatColor?taskCatColor.border:tc.bar; const barBgLight=taskCatColor?taskCatColor.bg:tc.barLight; const topOffset=topBase+lane*(TASK_ROW_H+TASK_GAP); const isDrag=dragging?.pid===proj.id&&dragging?.tid===task.id;
-                              return (<div key={task.id} onMouseEnter={e=>{setTooltip({startDate:task.startDate,endDate:task.endDate,name:task.name});setTooltipPos({x:e.clientX,y:e.clientY});}} onMouseMove={e=>setTooltipPos({x:e.clientX,y:e.clientY})} onMouseLeave={()=>{if(!isDrag)setTooltip(null);}} onMouseDown={e=>handleMouseDown(e,proj.id,task.id,'move')}
+                              return (<div key={task.id} onMouseEnter={e=>{if(tooltipTimer.current)clearTimeout(tooltipTimer.current);tooltipTimer.current=setTimeout(()=>{setTooltip({startDate:task.startDate,endDate:task.endDate,name:task.name});setTooltipPos({x:e.clientX,y:e.clientY});},80);}} onMouseMove={e=>setTooltipPos({x:e.clientX,y:e.clientY})} onMouseLeave={()=>{if(tooltipTimer.current)clearTimeout(tooltipTimer.current);if(!isDrag)setTooltip(null);}} onMouseDown={e=>handleMouseDown(e,proj.id,task.id,'move')}
                                 style={{position:'absolute',left:tpos.left,width:tpos.width,height:TASK_ROW_H,top:topOffset,background:barBgLight,borderRadius:3,zIndex:6,cursor:'grab',display:'flex',alignItems:'center',overflow:'visible',minWidth:4,border:`1px solid ${barBg}55`}}>
                                 <div onMouseDown={e=>handleMouseDown(e,proj.id,task.id,'start')} style={{position:'absolute',left:0,top:0,bottom:0,width:6,cursor:'ew-resize',zIndex:8,borderRadius:'3px 0 0 3px'}} />
                                 <div style={{width:`${task.progress||0}%`,height:'100%',background:barBg,borderRadius:3,opacity:0.7,pointerEvents:'none'}} />
@@ -1283,10 +1469,11 @@ function GanttChart({ user, appId, onAppChange, onLogout }: { user: any; appId: 
                             <div style={{width:SUB_COL,minWidth:SUB_COL,flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',padding:'8px 4px',borderRight:'1px solid #e5e7eb',fontSize:12,color:'#9ca3af',textAlign:'center',wordBreak:'break-all',position:'sticky',left:LEFT_COL+ASSIGNEE_COL,zIndex:8,background:'inherit'}}>{task.subAssignee||<span style={{color:'#d1d5db'}}>-</span>}</div>
                             <div style={{width:TIMELINE_W,minWidth:TIMELINE_W,flexShrink:0,position:'relative',minHeight:46,display:'flex',alignItems:'center'}}>
                               {GridLines}
+                              {DayOverlayLines}
                               {todayLeft!==null && <div style={{position:'absolute',left:todayLeft,top:0,bottom:0,width:2,background:'#ef4444',opacity:0.4,zIndex:5}} />}
                               {pos && (
-                                <div style={{position:'absolute',left:pos.left,width:pos.width,height:26,top:'50%',transform:'translateY(-50%)',background:catColor?catColor.bg:c.barLight,borderRadius:5,border:`1px solid ${catColor?catColor.border:c.bar}55`,cursor:'grab',zIndex:6,overflow:'visible'}}
-                                  onMouseDown={e=>handleMouseDown(e,proj.id,task.id,'move')} onMouseEnter={e=>{setTooltip({name:task.name,startDate:task.startDate,endDate:task.endDate});setTooltipPos({x:e.clientX,y:e.clientY});}} onMouseMove={e=>setTooltipPos({x:e.clientX,y:e.clientY})} onMouseLeave={()=>{if(!isDrag)setTooltip(null);}}>
+                                <div style={{position:'absolute',left:pos.left,width:pos.width,height:22,top:'50%',transform:'translateY(-50%)',background:catColor?catColor.bg:c.barLight,borderRadius:4,border:`1px solid ${catColor?catColor.border:c.bar}55`,cursor:'grab',zIndex:6,overflow:'visible'}}
+                                  onMouseDown={e=>handleMouseDown(e,proj.id,task.id,'move')} onMouseEnter={e=>{if(tooltipTimer.current)clearTimeout(tooltipTimer.current);tooltipTimer.current=setTimeout(()=>{setTooltip({name:task.name,startDate:task.startDate,endDate:task.endDate});setTooltipPos({x:e.clientX,y:e.clientY});},80);}} onMouseMove={e=>setTooltipPos({x:e.clientX,y:e.clientY})} onMouseLeave={()=>{if(tooltipTimer.current)clearTimeout(tooltipTimer.current);if(!isDrag)setTooltip(null);}}>
                                   <div style={{position:'absolute',left:0,top:0,bottom:0,width:8,cursor:'ew-resize',zIndex:8,borderRadius:'5px 0 0 5px'}} onMouseDown={e=>handleMouseDown(e,proj.id,task.id,'start')} />
                                   <div style={{width:`${task.progress||0}%`,height:'100%',background:catColor?catColor.border:c.bar,borderRadius:4,pointerEvents:'none'}} />
                                   {pos.width>40?<div style={{position:'absolute',inset:0,display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,fontWeight:700,pointerEvents:'none',color:'#1f2937'}}>{task.progress||0}%</div>:<div style={{position:'absolute',left:pos.width+5,top:'50%',transform:'translateY(-50%)',whiteSpace:'nowrap',fontSize:11,fontWeight:600,pointerEvents:'none',color:'#374151'}}>{task.progress||0}%</div>}
@@ -1306,15 +1493,26 @@ function GanttChart({ user, appId, onAppChange, onLogout }: { user: any; appId: 
         </div>
       </div>
 
-      {tooltip?.startDate && (
+      {tooltip && (tooltip.holidayOnly || tooltip.startDate) && (
         <div style={{position:'fixed',left:tooltipPos.x+14,top:tooltipPos.y-8,background:'#111827',color:'white',fontSize:13,padding:'10px 14px',borderRadius:8,whiteSpace:'nowrap',pointerEvents:'none',zIndex:99999,boxShadow:'0 4px 16px rgba(0,0,0,0.45)',lineHeight:1.7,border:'1px solid rgba(255,255,255,0.08)'}}>
-          {tooltip.name && <div style={{fontWeight:700,marginBottom:4,color:'#f1f5f9',fontSize:14}}>{tooltip.name}</div>}
-          <div style={{display:'flex',alignItems:'center',gap:6}}>
-            <span style={{color:'#6ee7b7',fontWeight:600,fontSize:13}}>▶</span>
-            <span style={{color:'#ffffff',fontWeight:600,letterSpacing:'0.3px'}}>{tooltip.startDate}</span>
-            <span style={{color:'#9ca3af',fontSize:12,margin:'0 2px'}}>→</span>
-            <span style={{color:'#ffffff',fontWeight:600,letterSpacing:'0.3px'}}>{tooltip.endDate}</span>
-          </div>
+          {tooltip.holidayOnly ? (
+            <div style={{display:'flex',alignItems:'center',gap:6,fontWeight:600,color:'#fca5a5',fontSize:13}}>
+              🗓️ {tooltip.name}
+            </div>
+          ) : (
+            <>
+              {tooltip.name && <div style={{fontWeight:700,marginBottom:4,color:'#f1f5f9',fontSize:14}}>{tooltip.name}</div>}
+              <div style={{display:'flex',alignItems:'center',gap:6}}>
+                <span style={{color:'#6ee7b7',fontWeight:600,fontSize:13}}>▶</span>
+                <span style={{color:'#ffffff',fontWeight:600,letterSpacing:'0.3px'}}>{tooltip.startDate}</span>
+                <span style={{color:'#9ca3af',fontSize:12,margin:'0 2px'}}>→</span>
+                <span style={{color:'#ffffff',fontWeight:600,letterSpacing:'0.3px'}}>{tooltip.endDate}</span>
+              </div>
+              {tooltip.startDate && KR_HOLIDAYS_2026[tooltip.startDate] && (
+                <div style={{fontSize:11,color:'#fca5a5',marginTop:3}}>🗓️ {KR_HOLIDAYS_2026[tooltip.startDate]}</div>
+              )}
+            </>
+          )}
         </div>
       )}
 
