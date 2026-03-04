@@ -1168,8 +1168,59 @@ function GanttChart({ user, appId, onAppChange, onLogout }: { user: any; appId: 
       `}</style>
 
       {/* Header */}
-      <div ref={headerRef} style={{background:'linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 60%, #16213e 100%)',borderBottom:'1px solid rgba(255,255,255,0.08)',padding:isPhoneLandscape?'6px 12px':'16px 24px',flexShrink:0,boxShadow:'0 2px 16px rgba(0,0,0,0.4)',position:'sticky',top:0,zIndex:30}}>
-        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:isPhoneLandscape?4:8}}>
+      {/* ── 헤더: 폰 가로 = 슬림 1줄 / PC·태블릿 = 풀 헤더 ── */}
+      <div ref={headerRef} style={{background:'linear-gradient(135deg,#0f0f1a 0%,#1a1a2e 60%,#16213e 100%)',borderBottom:'1px solid rgba(255,255,255,0.08)',flexShrink:0,boxShadow:'0 2px 16px rgba(0,0,0,0.4)',position:'sticky',top:0,zIndex:30,
+        padding: isPhoneLandscape ? '4px 10px' : '16px 24px'}}>
+
+        {isPhoneLandscape ? (
+          /* ── 폰 가로 슬림 헤더 (단 1줄, ~36px) ── */
+          <div style={{display:'flex',alignItems:'center',gap:6,height:32}}>
+            {/* 앱 전환 */}
+            <div style={{display:'flex',background:'rgba(255,255,255,0.07)',borderRadius:7,padding:2,border:'1px solid rgba(255,255,255,0.1)',flexShrink:0}}>
+              {([2,1] as const).map(id=>(
+                <button key={id} onClick={()=>onAppChange(id)} style={{padding:'3px 8px',borderRadius:5,border:'none',cursor:'pointer',fontSize:10,fontWeight:appId===id?700:400,
+                  background:appId===id?'linear-gradient(135deg,#6366f1,#8b5cf6)':'transparent',
+                  color:appId===id?'#fff':'rgba(148,163,184,0.7)',whiteSpace:'nowrap'}}>
+                  {id===2?'샌디앱':'통근버스'}
+                </button>
+              ))}
+            </div>
+            {/* 구분선 */}
+            <div style={{width:1,height:20,background:'rgba(255,255,255,0.15)',flexShrink:0}}/>
+            {/* 뷰 모드 */}
+            <div style={{display:'flex',background:'rgba(255,255,255,0.07)',borderRadius:7,padding:2,border:'1px solid rgba(255,255,255,0.1)',gap:1}}>
+              {([['year','월'],['half','월↔'],['week','주'],['day','일']] as const).map(([mode,label])=>(
+                <button key={mode} onClick={()=>{
+                  const el=chartScrollRef.current;
+                  if(el){const ratio=el.scrollLeft/(el.scrollWidth-el.clientWidth||1);setViewMode(mode as ViewMode);requestAnimationFrame(()=>requestAnimationFrame(()=>{if(chartScrollRef.current){chartScrollRef.current.scrollLeft=ratio*(chartScrollRef.current.scrollWidth-chartScrollRef.current.clientWidth);}}));}
+                  else setViewMode(mode as ViewMode);
+                }} style={{padding:'3px 8px',borderRadius:5,border:'none',cursor:'pointer',fontSize:11,fontWeight:viewMode===mode?700:400,
+                  background:viewMode===mode?'rgba(99,102,241,0.9)':'transparent',
+                  color:viewMode===mode?'white':'rgba(148,163,184,0.8)'}}>
+                  {label}
+                </button>
+              ))}
+            </div>
+            {/* 구분선 */}
+            <div style={{width:1,height:20,background:'rgba(255,255,255,0.15)',flexShrink:0}}/>
+            {/* 카테고리 필터 */}
+            <div style={{display:'flex',gap:3,overflow:'hidden',flex:1,alignItems:'center'}}>
+              <button onClick={()=>setActiveCategories([])} style={{padding:'2px 7px',borderRadius:10,fontSize:10,cursor:'pointer',flexShrink:0,fontWeight:activeCategories.length===0?700:400,border:activeCategories.length===0?'1px solid #818cf8':'1px solid rgba(255,255,255,0.3)',background:activeCategories.length===0?'rgba(99,102,241,0.35)':'rgba(255,255,255,0.08)',color:activeCategories.length===0?'#fff':'#e2e8f0'}}>전체</button>
+              {CATEGORIES.map(cat=>{const isActive=activeCategories.includes(cat);const cc=CATEGORY_COLORS[cat];return(
+                <button key={cat} onClick={()=>setActiveCategories(prev=>prev.includes(cat)?prev.filter(c=>c!==cat):[...prev,cat])} style={{padding:'2px 7px',borderRadius:10,fontSize:10,cursor:'pointer',flexShrink:0,fontWeight:isActive?700:400,border:isActive?`1px solid ${cc.border}`:'1px solid rgba(255,255,255,0.3)',background:isActive?`${cc.bg}22`:'rgba(255,255,255,0.08)',color:isActive?cc.border:'#e2e8f0'}}>{cat}</button>
+              );})}
+            </div>
+            {/* 구분선 */}
+            <div style={{width:1,height:20,background:'rgba(255,255,255,0.15)',flexShrink:0}}/>
+            {/* 추가 + 저장상태 */}
+            {saving && <div style={{width:8,height:8,border:'2px solid #4ade80',borderTopColor:'transparent',borderRadius:'50%',animation:'spin 0.8s linear infinite',flexShrink:0}}/>}
+            <button onClick={addProject} style={{padding:'3px 10px',background:'linear-gradient(135deg,#6366f1,#8b5cf6)',color:'white',border:'none',borderRadius:6,cursor:'pointer',fontSize:11,fontWeight:600,flexShrink:0,whiteSpace:'nowrap'}}>+ 추가</button>
+            <button onClick={onLogout} style={{padding:'3px 8px',background:'rgba(239,68,68,0.15)',border:'1px solid rgba(239,68,68,0.25)',borderRadius:6,cursor:'pointer',fontSize:10,color:'#fca5a5',flexShrink:0}}>로그아웃</button>
+          </div>
+        ) : (
+          /* ── PC / 태블릿 풀 헤더 ── */
+          <>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:8}}>
           <div style={{display:'flex',alignItems:'center',gap:12}}>
             <div>
               <div style={{display:'flex',alignItems:'center',gap:0,background:'rgba(255,255,255,0.07)',borderRadius:10,padding:4,border:'1px solid rgba(255,255,255,0.1)'}}>
@@ -1205,7 +1256,6 @@ function GanttChart({ user, appId, onAppChange, onLogout }: { user: any; appId: 
                 <button key={mode} onClick={()=>{
                   const el = chartScrollRef.current;
                   if (el) {
-                    // 현재 스크롤 비율(0~1) 저장 후 새 뷰에서 같은 비율로 복원
                     const ratio = el.scrollLeft / (el.scrollWidth - el.clientWidth || 1);
                     setViewMode(mode as ViewMode);
                     requestAnimationFrame(() => {
@@ -1235,7 +1285,7 @@ function GanttChart({ user, appId, onAppChange, onLogout }: { user: any; appId: 
         </div>
 
         {/* 카테고리 + 그룹 필터 */}
-        <div style={{display:'flex',gap:6,marginTop:isPhoneLandscape?4:12,alignItems:'center',flexWrap:'wrap'}}>
+        <div style={{display:'flex',gap:6,marginTop:12,alignItems:'center',flexWrap:'wrap'}}>
           <span style={{fontSize:12,color:'#e2e8f0',flexShrink:0,fontWeight:600}}>카테고리:</span>
           <button onClick={()=>setActiveCategories([])} style={{padding:'5px 14px',borderRadius:20,fontSize:12,cursor:'pointer',fontWeight:activeCategories.length===0?600:400,border:activeCategories.length===0?'1.5px solid #818cf8':'1.5px solid rgba(255,255,255,0.4)',background:activeCategories.length===0?'rgba(99,102,241,0.35)':'rgba(255,255,255,0.12)',color:activeCategories.length===0?'#fff':'#e2e8f0'}}>전체 <span style={{marginLeft:2,fontSize:11,opacity:0.9}}>{projects.length}</span></button>
           {CATEGORIES.map(cat=>{ const isActive=activeCategories.includes(cat); const cc=CATEGORY_COLORS[cat]; return (
@@ -1257,8 +1307,8 @@ function GanttChart({ user, appId, onAppChange, onLogout }: { user: any; appId: 
           </>}
         </div>
 
-        {/* Legend - 폰 가로에서 숨김 */}
-        {!isPhoneLandscape && <div style={{display:'flex',alignItems:'center',gap:16,marginTop:10,flexWrap:'wrap',paddingTop:10,borderTop:'1px solid rgba(255,255,255,0.15)'}}>
+        {/* Legend */}
+        {<div style={{display:'flex',alignItems:'center',gap:16,marginTop:10,flexWrap:'wrap',paddingTop:10,borderTop:'1px solid rgba(255,255,255,0.15)'}}>
           <div style={{display:'flex',alignItems:'center',gap:5,flexShrink:0}}>
             {(['영업','기획','운영','개발','보안'] as string[]).map(cat=>{ const cc=({'영업':{bg:'#fef3c7',text:'#92400e',border:'#f59e0b'},'기획':{bg:'#fce7f3',text:'#9d174d',border:'#ec4899'},'운영':{bg:'#e0f2fe',text:'#075985',border:'#0ea5e9'},'개발':{bg:'#d1fae5',text:'#065f46',border:'#10b981'},'보안':{bg:'#fee2e2',text:'#991b1b',border:'#ef4444'}} as any)[cat]; return <span key={cat} style={{fontSize:11,padding:'2px 8px',borderRadius:10,background:cc.bg,color:cc.text,border:`1px solid ${cc.border}`,fontWeight:600,whiteSpace:'nowrap'}}>{cat}</span>; })}
           </div>
@@ -1273,6 +1323,8 @@ function GanttChart({ user, appId, onAppChange, onLogout }: { user: any; appId: 
             <span style={{fontSize:12,color:'#94a3b8'}}>⠿ 드래그로 순서 변경 | 바 드래그로 일정 조정 | 그룹명 더블클릭 이름 변경</span>
           </div>
         </div>}
+          </>
+        )}
       </div>
 
       {/* Chart */}
