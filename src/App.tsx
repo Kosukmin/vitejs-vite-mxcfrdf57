@@ -70,20 +70,20 @@ const classifyDevice = (w: number, h: number): DeviceType => {
   return 'phone';                              // 일반 폰
 };
 
-// 간트 데스크탑 뷰를 보여줄지 여부
+// 간트 뷰 표시 여부
 // - 데스크탑: 항상 간트
-// - 태블릿 가로: 간트
+// - 태블릿 가로/폴드펼침 가로: 간트
 // - 태블릿 세로: 카드
-// - 폰 / 폴드 접힘 가로세로: 카드
-// - 폴드 펼침(short>=600): 가로 → 간트, 세로 → 카드
+// - 폰 가로(landscape): 간트 (헤더 compact)
+// - 폰 세로 / 폴드 접힘: 카드
 const shouldShowGantt = (w: number, h: number): boolean => {
   const device = classifyDevice(w, h);
   const isLandscape = w > h;
   if (device === 'desktop') return true;
-  if (device === 'tablet')  return isLandscape;  // 태블릿 가로만 간트
+  if (device === 'tablet')  return isLandscape;
   if (device === 'fold')    return false;         // 폴드 접힘 항상 카드
-  // phone
-  return false;                                  // 폰 항상 카드
+  // phone: 가로만 간트
+  return isLandscape;
 };
 
 const calcLayout = (mode: ViewMode, screenW: number) => {
@@ -363,6 +363,8 @@ function GanttChart({ user, appId, onAppChange, onLogout }: { user: any; appId: 
   const showGantt = shouldShowGantt(screenW, screenH);
   const deviceType = classifyDevice(screenW, screenH);
   const isPortrait = screenH > screenW;
+  // 폰 가로: 간트 뷰이지만 화면 높이가 낮아 헤더 compact 처리
+  const isPhoneLandscape = deviceType === 'phone' && !isPortrait;
 
   const layout       = React.useMemo(() => calcLayout(viewMode, screenW), [viewMode, screenW]);
   const LEFT_COL     = layout.leftCol;
@@ -1147,8 +1149,8 @@ function GanttChart({ user, appId, onAppChange, onLogout }: { user: any; appId: 
       `}</style>
 
       {/* Header */}
-      <div ref={headerRef} style={{background:'linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 60%, #16213e 100%)',borderBottom:'1px solid rgba(255,255,255,0.08)',padding:'16px 24px',flexShrink:0,boxShadow:'0 2px 16px rgba(0,0,0,0.4)',position:'sticky',top:0,zIndex:30}}>
-        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:8}}>
+      <div ref={headerRef} style={{background:'linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 60%, #16213e 100%)',borderBottom:'1px solid rgba(255,255,255,0.08)',padding:isPhoneLandscape?'6px 12px':'16px 24px',flexShrink:0,boxShadow:'0 2px 16px rgba(0,0,0,0.4)',position:'sticky',top:0,zIndex:30}}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:isPhoneLandscape?4:8}}>
           <div style={{display:'flex',alignItems:'center',gap:12}}>
             <div>
               <div style={{display:'flex',alignItems:'center',gap:0,background:'rgba(255,255,255,0.07)',borderRadius:10,padding:4,border:'1px solid rgba(255,255,255,0.1)'}}>
@@ -1214,7 +1216,7 @@ function GanttChart({ user, appId, onAppChange, onLogout }: { user: any; appId: 
         </div>
 
         {/* 카테고리 + 그룹 필터 */}
-        <div style={{display:'flex',gap:6,marginTop:12,alignItems:'center',flexWrap:'wrap'}}>
+        <div style={{display:'flex',gap:6,marginTop:isPhoneLandscape?4:12,alignItems:'center',flexWrap:'wrap'}}>
           <span style={{fontSize:12,color:'#e2e8f0',flexShrink:0,fontWeight:600}}>카테고리:</span>
           <button onClick={()=>setActiveCategories([])} style={{padding:'5px 14px',borderRadius:20,fontSize:12,cursor:'pointer',fontWeight:activeCategories.length===0?600:400,border:activeCategories.length===0?'1.5px solid #818cf8':'1.5px solid rgba(255,255,255,0.4)',background:activeCategories.length===0?'rgba(99,102,241,0.35)':'rgba(255,255,255,0.12)',color:activeCategories.length===0?'#fff':'#e2e8f0'}}>전체 <span style={{marginLeft:2,fontSize:11,opacity:0.9}}>{projects.length}</span></button>
           {CATEGORIES.map(cat=>{ const isActive=activeCategories.includes(cat); const cc=CATEGORY_COLORS[cat]; return (
@@ -1236,8 +1238,8 @@ function GanttChart({ user, appId, onAppChange, onLogout }: { user: any; appId: 
           </>}
         </div>
 
-        {/* Legend */}
-        <div style={{display:'flex',alignItems:'center',gap:16,marginTop:10,flexWrap:'wrap',paddingTop:10,borderTop:'1px solid rgba(255,255,255,0.15)'}}>
+        {/* Legend - 폰 가로에서 숨김 */}
+        {!isPhoneLandscape && <div style={{display:'flex',alignItems:'center',gap:16,marginTop:10,flexWrap:'wrap',paddingTop:10,borderTop:'1px solid rgba(255,255,255,0.15)'}}>
           <div style={{display:'flex',alignItems:'center',gap:5,flexShrink:0}}>
             {(['영업','기획','운영','개발','보안'] as string[]).map(cat=>{ const cc=({'영업':{bg:'#fef3c7',text:'#92400e',border:'#f59e0b'},'기획':{bg:'#fce7f3',text:'#9d174d',border:'#ec4899'},'운영':{bg:'#e0f2fe',text:'#075985',border:'#0ea5e9'},'개발':{bg:'#d1fae5',text:'#065f46',border:'#10b981'},'보안':{bg:'#fee2e2',text:'#991b1b',border:'#ef4444'}} as any)[cat]; return <span key={cat} style={{fontSize:11,padding:'2px 8px',borderRadius:10,background:cc.bg,color:cc.text,border:`1px solid ${cc.border}`,fontWeight:600,whiteSpace:'nowrap'}}>{cat}</span>; })}
           </div>
@@ -1251,7 +1253,7 @@ function GanttChart({ user, appId, onAppChange, onLogout }: { user: any; appId: 
             </>}
             <span style={{fontSize:12,color:'#94a3b8'}}>⠿ 드래그로 순서 변경 | 바 드래그로 일정 조정 | 그룹명 더블클릭 이름 변경</span>
           </div>
-        </div>
+        </div>}
       </div>
 
       {/* Chart */}
@@ -1294,7 +1296,7 @@ function GanttChart({ user, appId, onAppChange, onLogout }: { user: any; appId: 
                               fontSize:10,fontWeight:st.fontWeight,color:st.color,
                               borderRight:'1px solid #e8ecf8',background:st.bg,
                               position:'relative',
-                              cursor:h.isHoliday?'help':'default',
+                              cursor:'default',
                             }}
                             onMouseEnter={h.isHoliday ? e => {
                               if(tooltipTimer.current) clearTimeout(tooltipTimer.current);
