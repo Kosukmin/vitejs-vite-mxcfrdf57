@@ -59,13 +59,17 @@ type DeviceType = 'phone' | 'tablet' | 'fold' | 'desktop';
 const classifyDevice = (w: number, h: number): DeviceType => {
   // 비터치(마우스) = 데스크탑
   if (!isTouchDevice()) return 'desktop';
-  // short/long 은 항상 가로세로 방향 무관한 실제 물리 짧은 변
   const short = Math.min(w, h);
-  // 갤럭시 폴드 접힘: short ≈ 280~344px  (Z Fold6 접힘 short=344)
-  if (short <= 344) return 'fold';
+  // 실측값:
+  //   iPhone 15 가로 short=324px
+  //   Galaxy Z Fold6 접힘 가로 short≈280px, 세로 short=344px  ← 여기서 혼선
+  //   → fold 판별은 short+long 비율로: short<300 AND long>700 조합으로 좁힘
+  const long = Math.max(w, h);
+  const isFoldClosed = short < 300 && long > 700;
+  if (isFoldClosed) return 'fold';
   // 태블릿 / 폴드 펼침: short ≥ 600px
   if (short >= 600) return 'tablet';
-  // 일반 폰: short 345~599px  (Galaxy S/A, iPhone 모두 해당)
+  // 일반 폰: short 300~599px
   return 'phone';
 };
 
@@ -949,12 +953,7 @@ function GanttChart({ user, appId, onAppChange, onLogout }: { user: any; appId: 
 
     return (
       <div style={{height:'100dvh',width:'100%',maxWidth:'100vw',display:'flex',flexDirection:'column',background:'#0f0f1a',fontFamily:"'Pretendard',-apple-system,BlinkMacSystemFont,sans-serif",overflow:'hidden',boxSizing:'border-box'}}>
-        {/* 🔧 DEBUG — 나중에 제거 */}
-        <div style={{position:'fixed',bottom:80,left:8,zIndex:9999,background:'rgba(0,0,0,0.75)',color:'#4ade80',fontSize:10,padding:'4px 8px',borderRadius:6,pointerEvents:'none',lineHeight:1.6}}>
-          w={screenW} h={screenH} short={Math.min(screenW,screenH)}<br/>
-          device={deviceType} landscape={String(screenW>screenH)}<br/>
-          showGantt={String(showGantt)}
-        </div>
+
         <style>{`
           @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
           @keyframes spin{to{transform:rotate(360deg)}}
