@@ -54,22 +54,15 @@ const KR_HOLIDAYS_2026: Record<string, string> = {
 // 터치 디바이스 여부 (실기기 기준)
 const isTouchDevice = () => 'ontouchstart' in window || navigator.maxTouchPoints > 0;
 
-type DeviceType = 'phone' | 'tablet' | 'fold' | 'desktop';
+type DeviceType = 'phone' | 'tablet' | 'fold' | 'fold-open' | 'desktop';
 
 const classifyDevice = (w: number, h: number): DeviceType => {
-  // 비터치(마우스) = 데스크탑
   if (!isTouchDevice()) return 'desktop';
   const short = Math.min(w, h);
-  // 실측값:
-  //   iPhone 15 가로 short=324px
-  //   Galaxy Z Fold6 접힘 가로 short≈280px, 세로 short=344px  ← 여기서 혼선
-  //   → fold 판별은 short+long 비율로: short<300 AND long>700 조합으로 좁힘
-  const long = Math.max(w, h);
-  const isFoldClosed = short < 300 && long > 700;
-  if (isFoldClosed) return 'fold';
-  // 태블릿 / 폴드 펼침: short ≥ 600px
-  if (short >= 600) return 'tablet';
-  // 일반 폰: short 300~599px
+  const long  = Math.max(w, h);
+  if (short < 300 && long > 700) return 'fold';                   // 폴드 접힘
+  if (short >= 600 && long / short < 1.35) return 'fold-open';    // 폴드 펼침 (비율 1.26)
+  if (short >= 600) return 'tablet';                              // 태블릿
   return 'phone';
 };
 
@@ -78,22 +71,31 @@ const classifyDevice = (w: number, h: number): DeviceType => {
 // │ 기기             │ 세로 │ 가로 │
 // ├──────────────────┼──────┼──────┤
 // │ 데스크탑         │ 간트 │ 간트 │
-// │ 태블릿/폴드펼침  │ 카드 │ 간트 │
-// │ 일반폰           │ 카드 │ 간트 │
+// │ 태블릿           │ 카드 │ 간트 │
+// │ 일반폰           │ 카드 │ 카드 │
 // │ 폴드접힘         │ 카드 │ 카드 │
+// │ 폴드펼침(태블릿) │ 카드 │ 간트 │
 // └──────────────────┴──────┴──────┘
 const shouldShowGantt = (w: number, h: number): boolean => {
   const device = classifyDevice(w, h);
-  if (device === 'desktop') return true;
-  if (device === 'fold')    return false;   // 폴드 접힘은 세로/가로 모두 카드
-  // phone / tablet: 가로(landscape)일 때만 간트
-  return w > h;
+  if (device === 'desktop')   return true;
+  if (device === 'tablet')    return w > h;   // 태블릿: 가로만 간트
+  if (device === 'fold-open') return true;    // 폴드 펼침: 세로/가로 모두 간트
+  return false;                               // 폰/폴드접힘: 항상 카드
 };
 
-const calcLayout = (mode: ViewMode, screenW: number) => {
-  const leftCol     = Math.max(260, Math.floor(screenW * 0.30));
-  const assigneeCol = Math.max(56,  Math.floor(screenW * 0.06));
-  const subCol      = Math.max(56,  Math.floor(screenW * 0.06));
+const calcLayout = (mode: ViewMode, screenW: number, deviceType: string = 'desktop') => {
+  // 태블릿/폴드펼침: 좌측 컬럼 좁게 (화면의 22%), 담당 컬럼도 축소
+  const isCompact = deviceType === 'tablet' || deviceType === 'fold-open';
+  const leftCol     = isCompact
+    ? Math.max(160, Math.floor(screenW * 0.22))
+    : Math.max(260, Math.floor(screenW * 0.30));
+  const assigneeCol = isCompact
+    ? Math.max(44, Math.floor(screenW * 0.05))
+    : Math.max(56, Math.floor(screenW * 0.06));
+  const subCol      = isCompact
+    ? Math.max(44, Math.floor(screenW * 0.05))
+    : Math.max(56, Math.floor(screenW * 0.06));
   const availW      = screenW - leftCol - assigneeCol - subCol;
 
   let colW: number, totalTimelineW: number;
@@ -384,10 +386,12 @@ function GanttChart({ user, appId, onAppChange, onLogout }: { user: any; appId: 
   const showGantt = shouldShowGantt(screenW, screenH);
   const deviceType = classifyDevice(screenW, screenH);
   const isPortrait = screenH > screenW;
-  // 폰 가로: 간트 뷰이지만 화면 높이가 낮아 헤더 compact 처리
-  const isPhoneLandscape = deviceType === 'phone' && !isPortrait;
+  const isCompactUI   = deviceType === 'fold-open';
+  // 폴드펼침 + 태블릿 가로 둘 다 슬림 헤더
+  const isCompactUI  = isCompactUI || (deviceType === 'tablet' && !isPortrait);
 
-  const layout       = React.useMemo(() => calcLayout(viewMode, screenW), [viewMode, screenW]);
+
+  const layout       = React.useMemo(() => calcLayout(viewMode, screenW, deviceType), [viewMode, screenW, deviceType]);
   const LEFT_COL     = layout.leftCol;
   const ASSIGNEE_COL = layout.assigneeCol;
   const SUB_COL      = layout.subCol;
@@ -1168,55 +1172,53 @@ function GanttChart({ user, appId, onAppChange, onLogout }: { user: any; appId: 
       `}</style>
 
       {/* Header */}
-      {/* ── 헤더: 폰 가로 = 슬림 1줄 / PC·태블릿 = 풀 헤더 ── */}
-      <div ref={headerRef} style={{background:'linear-gradient(135deg,#0f0f1a 0%,#1a1a2e 60%,#16213e 100%)',borderBottom:'1px solid rgba(255,255,255,0.08)',flexShrink:0,boxShadow:'0 2px 16px rgba(0,0,0,0.4)',position:'sticky',top:0,zIndex:30,
-        padding: isPhoneLandscape ? '4px 10px' : '16px 24px'}}>
-
-        {isPhoneLandscape ? (
-          /* ── 폰 가로 슬림 헤더 (단 1줄, ~36px) ── */
-          <div style={{display:'flex',alignItems:'center',gap:6,height:32}}>
-            {/* 앱 전환 */}
-            <div style={{display:'flex',background:'rgba(255,255,255,0.07)',borderRadius:7,padding:2,border:'1px solid rgba(255,255,255,0.1)',flexShrink:0}}>
-              {([2,1] as const).map(id=>(
-                <button key={id} onClick={()=>onAppChange(id)} style={{padding:'3px 8px',borderRadius:5,border:'none',cursor:'pointer',fontSize:10,fontWeight:appId===id?700:400,
-                  background:appId===id?'linear-gradient(135deg,#6366f1,#8b5cf6)':'transparent',
-                  color:appId===id?'#fff':'rgba(148,163,184,0.7)',whiteSpace:'nowrap'}}>
-                  {id===2?'샌디앱':'통근버스'}
-                </button>
-              ))}
+      <div ref={headerRef} style={{background:'linear-gradient(135deg,#0f0f1a 0%,#1a1a2e 60%,#16213e 100%)',borderBottom:'1px solid rgba(255,255,255,0.08)',padding:isCompactUI?'6px 16px':'16px 24px',flexShrink:0,boxShadow:'0 2px 16px rgba(0,0,0,0.4)',position:'sticky',top:0,zIndex:30}}>
+        {isCompactUI ? (
+          /* ── 폴드펼침/태블릿가로 슬림 헤더 2줄 ── */
+          <>
+            {/* 1줄: 앱전환 + 저장중 + 뷰모드 + 추가버튼 + 로그아웃 */}
+            <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:5}}>
+              <div style={{display:'flex',background:'rgba(255,255,255,0.07)',borderRadius:8,padding:3,border:'1px solid rgba(255,255,255,0.1)',gap:1}}>
+                {([2,1] as const).map(id=>(
+                  <button key={id} onClick={()=>onAppChange(id)} style={{padding:'4px 12px',borderRadius:6,border:'none',cursor:'pointer',fontSize:12,fontWeight:appId===id?700:400,
+                    background:appId===id?'linear-gradient(135deg,#6366f1,#8b5cf6)':'transparent',
+                    color:appId===id?'#fff':'rgba(148,163,184,0.7)'}}>
+                    {id===2?'샌디앱':'통근버스'}
+                  </button>
+                ))}
+              </div>
+              <div style={{width:1,height:18,background:'rgba(255,255,255,0.15)'}}/>
+              <div style={{display:'flex',background:'rgba(255,255,255,0.07)',borderRadius:8,padding:3,border:'1px solid rgba(255,255,255,0.12)',gap:1}}>
+                {([['year','월'],['half','월↔'],['week','주'],['day','일']] as const).map(([mode,label])=>(
+                  <button key={mode} onClick={()=>{const el=chartScrollRef.current;if(el){const r=el.scrollLeft/(el.scrollWidth-el.clientWidth||1);setViewMode(mode as ViewMode);requestAnimationFrame(()=>requestAnimationFrame(()=>{if(chartScrollRef.current)chartScrollRef.current.scrollLeft=r*(chartScrollRef.current.scrollWidth-chartScrollRef.current.clientWidth);}));}else setViewMode(mode as ViewMode);}}
+                    style={{padding:'4px 10px',borderRadius:6,border:'none',cursor:'pointer',fontSize:12,fontWeight:viewMode===mode?700:400,
+                      background:viewMode===mode?'rgba(99,102,241,0.9)':'transparent',
+                      color:viewMode===mode?'white':'rgba(148,163,184,0.8)'}}>
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <div style={{flex:1}}/>
+              {saving && <div style={{display:'flex',alignItems:'center',gap:4,fontSize:11,color:'#4ade80'}}><div style={{width:8,height:8,border:'2px solid #4ade80',borderTopColor:'transparent',borderRadius:'50%',animation:'spin 0.8s linear infinite'}}/>저장중</div>}
+              {realtimeToast && <span style={{fontSize:11,color:'#4ade80',fontWeight:600,animation:'fadeInDown 0.3s ease'}}>🔄 업데이트</span>}
+              <button onClick={addProject} style={{padding:'4px 12px',background:'linear-gradient(135deg,#6366f1,#8b5cf6)',color:'white',border:'none',borderRadius:7,cursor:'pointer',fontSize:12,fontWeight:600}}>+ 추가</button>
+              <button onClick={onLogout} style={{padding:'4px 10px',background:'rgba(239,68,68,0.15)',border:'1px solid rgba(239,68,68,0.25)',borderRadius:7,cursor:'pointer',fontSize:11,color:'#fca5a5'}}>로그아웃</button>
             </div>
-            {/* 구분선 */}
-            <div style={{width:1,height:20,background:'rgba(255,255,255,0.15)',flexShrink:0}}/>
-            {/* 뷰 모드 */}
-            <div style={{display:'flex',background:'rgba(255,255,255,0.07)',borderRadius:7,padding:2,border:'1px solid rgba(255,255,255,0.1)',gap:1}}>
-              {([['year','월'],['half','월↔'],['week','주'],['day','일']] as const).map(([mode,label])=>(
-                <button key={mode} onClick={()=>{
-                  const el=chartScrollRef.current;
-                  if(el){const ratio=el.scrollLeft/(el.scrollWidth-el.clientWidth||1);setViewMode(mode as ViewMode);requestAnimationFrame(()=>requestAnimationFrame(()=>{if(chartScrollRef.current){chartScrollRef.current.scrollLeft=ratio*(chartScrollRef.current.scrollWidth-chartScrollRef.current.clientWidth);}}));}
-                  else setViewMode(mode as ViewMode);
-                }} style={{padding:'3px 8px',borderRadius:5,border:'none',cursor:'pointer',fontSize:11,fontWeight:viewMode===mode?700:400,
-                  background:viewMode===mode?'rgba(99,102,241,0.9)':'transparent',
-                  color:viewMode===mode?'white':'rgba(148,163,184,0.8)'}}>
-                  {label}
-                </button>
-              ))}
-            </div>
-            {/* 구분선 */}
-            <div style={{width:1,height:20,background:'rgba(255,255,255,0.15)',flexShrink:0}}/>
-            {/* 카테고리 필터 */}
-            <div style={{display:'flex',gap:3,overflow:'hidden',flex:1,alignItems:'center'}}>
-              <button onClick={()=>setActiveCategories([])} style={{padding:'2px 7px',borderRadius:10,fontSize:10,cursor:'pointer',flexShrink:0,fontWeight:activeCategories.length===0?700:400,border:activeCategories.length===0?'1px solid #818cf8':'1px solid rgba(255,255,255,0.3)',background:activeCategories.length===0?'rgba(99,102,241,0.35)':'rgba(255,255,255,0.08)',color:activeCategories.length===0?'#fff':'#e2e8f0'}}>전체</button>
+            {/* 2줄: 카테고리 필터 */}
+            <div style={{display:'flex',gap:4,alignItems:'center',flexWrap:'wrap'}}>
+              <button onClick={()=>setActiveCategories([])} style={{padding:'3px 10px',borderRadius:14,fontSize:11,cursor:'pointer',fontWeight:activeCategories.length===0?600:400,border:activeCategories.length===0?'1.5px solid #818cf8':'1.5px solid rgba(255,255,255,0.3)',background:activeCategories.length===0?'rgba(99,102,241,0.35)':'rgba(255,255,255,0.08)',color:activeCategories.length===0?'#fff':'#e2e8f0'}}>전체 {projects.length}</button>
               {CATEGORIES.map(cat=>{const isActive=activeCategories.includes(cat);const cc=CATEGORY_COLORS[cat];return(
-                <button key={cat} onClick={()=>setActiveCategories(prev=>prev.includes(cat)?prev.filter(c=>c!==cat):[...prev,cat])} style={{padding:'2px 7px',borderRadius:10,fontSize:10,cursor:'pointer',flexShrink:0,fontWeight:isActive?700:400,border:isActive?`1px solid ${cc.border}`:'1px solid rgba(255,255,255,0.3)',background:isActive?`${cc.bg}22`:'rgba(255,255,255,0.08)',color:isActive?cc.border:'#e2e8f0'}}>{cat}</button>
+                <button key={cat} onClick={()=>setActiveCategories(prev=>prev.includes(cat)?prev.filter(c=>c!==cat):[...prev,cat])} style={{padding:'3px 10px',borderRadius:14,fontSize:11,cursor:'pointer',fontWeight:isActive?600:400,border:isActive?`1.5px solid ${cc.border}`:'1.5px solid rgba(255,255,255,0.3)',background:isActive?`${cc.bg}22`:'rgba(255,255,255,0.08)',color:isActive?cc.border:'#e2e8f0'}}>{cat}</button>
               );})}
+              {allGroups.length>0 && <>
+                <div style={{width:1,height:14,background:'rgba(255,255,255,0.25)'}}/>
+                <button onClick={()=>setActiveGroup('')} style={{padding:'3px 10px',borderRadius:14,fontSize:11,cursor:'pointer',fontWeight:activeGroup===''?600:400,border:activeGroup===''?'1.5px solid #818cf8':'1.5px solid rgba(255,255,255,0.3)',background:activeGroup===''?'rgba(99,102,241,0.35)':'rgba(255,255,255,0.08)',color:activeGroup===''?'#fff':'#e2e8f0'}}>전체그룹</button>
+                {allGroups.map(g=>(
+                  <button key={g} onClick={()=>setActiveGroup(prev=>prev===g?'':g)} style={{padding:'3px 10px',borderRadius:14,fontSize:11,cursor:'pointer',fontWeight:activeGroup===g?600:400,border:activeGroup===g?'1.5px solid #818cf8':'1.5px solid rgba(255,255,255,0.3)',background:activeGroup===g?'rgba(99,102,241,0.35)':'rgba(255,255,255,0.08)',color:activeGroup===g?'#fff':'#e2e8f0'}}>{g}</button>
+                ))}
+              </>}
             </div>
-            {/* 구분선 */}
-            <div style={{width:1,height:20,background:'rgba(255,255,255,0.15)',flexShrink:0}}/>
-            {/* 추가 + 저장상태 */}
-            {saving && <div style={{width:8,height:8,border:'2px solid #4ade80',borderTopColor:'transparent',borderRadius:'50%',animation:'spin 0.8s linear infinite',flexShrink:0}}/>}
-            <button onClick={addProject} style={{padding:'3px 10px',background:'linear-gradient(135deg,#6366f1,#8b5cf6)',color:'white',border:'none',borderRadius:6,cursor:'pointer',fontSize:11,fontWeight:600,flexShrink:0,whiteSpace:'nowrap'}}>+ 추가</button>
-            <button onClick={onLogout} style={{padding:'3px 8px',background:'rgba(239,68,68,0.15)',border:'1px solid rgba(239,68,68,0.25)',borderRadius:6,cursor:'pointer',fontSize:10,color:'#fca5a5',flexShrink:0}}>로그아웃</button>
-          </div>
+          </>
         ) : (
           /* ── PC / 태블릿 풀 헤더 ── */
           <>
@@ -1351,7 +1353,7 @@ function GanttChart({ user, appId, onAppChange, onLogout }: { user: any; appId: 
               </div>
               {/* 주/일 행 */}
               <div style={{display:'flex',height:22}}>
-                <div style={{width:LEFT_COL,minWidth:LEFT_COL,flexShrink:0,padding:'0 16px',fontWeight:600,fontSize:13,color:'#374151',borderRight:'1px solid #e5e7eb',background:'#f9fafb',position:'sticky',left:0,zIndex:10,display:'flex',alignItems:'center'}}>프로젝트 / Task</div>
+                <div style={{width:LEFT_COL,minWidth:LEFT_COL,flexShrink:0,padding:'0 12px',fontWeight:600,fontSize:isCompactUI?11:13,color:'#374151',borderRight:'1px solid #e5e7eb',background:'#f9fafb',position:'sticky',left:0,zIndex:10,display:'flex',alignItems:'center'}}>프로젝트 / Task</div>
                 <div style={{width:ASSIGNEE_COL,minWidth:ASSIGNEE_COL,flexShrink:0,fontWeight:600,fontSize:12,color:'#374151',borderRight:'1px solid #e5e7eb',background:'#f9fafb',textAlign:'center',position:'sticky',left:LEFT_COL,zIndex:10,display:'flex',alignItems:'center',justifyContent:'center'}}>담당(정)</div>
                 <div style={{width:SUB_COL,minWidth:SUB_COL,flexShrink:0,fontWeight:600,fontSize:12,color:'#374151',borderRight:'1px solid #e5e7eb',background:'#f9fafb',textAlign:'center',position:'sticky',left:LEFT_COL+ASSIGNEE_COL,zIndex:10,display:'flex',alignItems:'center',justifyContent:'center'}}>담당(부)</div>
                 <div style={{display:'flex',width:TIMELINE_W,minWidth:TIMELINE_W,flexShrink:0,overflow:'hidden'}}>
@@ -1389,9 +1391,9 @@ function GanttChart({ user, appId, onAppChange, onLogout }: { user: any; appId: 
             </div>
           ) : (
             <div style={{display:'flex',position:'sticky',top:0,zIndex:20,background:'white',borderBottom:'1px solid #e5e7eb',boxShadow:'0 1px 3px rgba(0,0,0,0.05)',width:totalW,height:42}}>
-              <div style={{width:LEFT_COL,minWidth:LEFT_COL,flexShrink:0,padding:'0 16px',fontWeight:600,fontSize:14,color:'#374151',borderRight:'1px solid #e5e7eb',background:'#f9fafb',position:'sticky',left:0,zIndex:10,display:'flex',alignItems:'center'}}>프로젝트 / Task</div>
-              <div style={{width:ASSIGNEE_COL,minWidth:ASSIGNEE_COL,flexShrink:0,fontWeight:600,fontSize:13,color:'#374151',borderRight:'1px solid #e5e7eb',background:'#f9fafb',textAlign:'center',position:'sticky',left:LEFT_COL,zIndex:10,display:'flex',alignItems:'center',justifyContent:'center'}}>담당(정)</div>
-              <div style={{width:SUB_COL,minWidth:SUB_COL,flexShrink:0,fontWeight:600,fontSize:13,color:'#374151',borderRight:'1px solid #e5e7eb',background:'#f9fafb',textAlign:'center',position:'sticky',left:LEFT_COL+ASSIGNEE_COL,zIndex:10,display:'flex',alignItems:'center',justifyContent:'center'}}>담당(부)</div>
+              <div style={{width:LEFT_COL,minWidth:LEFT_COL,flexShrink:0,padding:'0 12px',fontWeight:600,fontSize:isCompactUI?12:14,color:'#374151',borderRight:'1px solid #e5e7eb',background:'#f9fafb',position:'sticky',left:0,zIndex:10,display:'flex',alignItems:'center'}}>프로젝트 / Task</div>
+              <div style={{width:ASSIGNEE_COL,minWidth:ASSIGNEE_COL,flexShrink:0,fontWeight:600,fontSize:isCompactUI?10:13,color:'#374151',borderRight:'1px solid #e5e7eb',background:'#f9fafb',textAlign:'center',position:'sticky',left:LEFT_COL,zIndex:10,display:'flex',alignItems:'center',justifyContent:'center'}}>담당(정)</div>
+              <div style={{width:SUB_COL,minWidth:SUB_COL,flexShrink:0,fontWeight:600,fontSize:isCompactUI?10:13,color:'#374151',borderRight:'1px solid #e5e7eb',background:'#f9fafb',textAlign:'center',position:'sticky',left:LEFT_COL+ASSIGNEE_COL,zIndex:10,display:'flex',alignItems:'center',justifyContent:'center'}}>담당(부)</div>
               <div style={{display:'flex',width:TIMELINE_W,minWidth:TIMELINE_W,flexShrink:0,alignItems:'center'}}>
                 {MONTH_LABELS.map((m,i)=>(<div key={i} style={{width:MONTH_COL,minWidth:MONTH_COL,flexShrink:0,textAlign:'center',height:'100%',display:'flex',alignItems:'center',justifyContent:'center',fontSize:12,fontWeight:600,color:'#4b5563',borderRight:i<11?'1px solid #e5e7eb':'none',background:'#f9fafb'}}>{m}</div>))}
               </div>
