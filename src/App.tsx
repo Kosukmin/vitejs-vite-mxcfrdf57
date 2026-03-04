@@ -341,25 +341,38 @@ function GanttChart({ user, appId, onAppChange, onLogout }: { user: any; appId: 
   const currentApp = APP_CONFIG[appId];
 
   const [viewMode, setViewMode] = useState<ViewMode>('year');
-  const [screenW, setScreenW] = useState(window.innerWidth);
-  const [screenH, setScreenH] = useState(window.innerHeight);
+  // iOS Safari: innerWidth/Height가 주소창에 따라 불안정 → screen.width/height 기반으로 보정
+  const getW = () => window.innerWidth  || window.screen.width;
+  const getH = () => window.innerHeight || window.screen.height;
+  const [screenW, setScreenW] = useState(getW);
+  const [screenH, setScreenH] = useState(getH);
 
   useEffect(() => {
     const updateSize = () => {
-      setScreenW(window.innerWidth);
-      setScreenH(window.innerHeight);
+      // visualViewport가 있으면 더 정확 (iOS 13+)
+      const vv = (window as any).visualViewport;
+      const w = vv ? Math.round(vv.width)  : window.innerWidth  || window.screen.width;
+      const h = vv ? Math.round(vv.height) : window.innerHeight || window.screen.height;
+      setScreenW(w);
+      setScreenH(h);
     };
-    // orientationchange: iOS/Android 모두 안정적으로 잡기
+    // orientationchange: iOS Safari는 500ms까지 늦게 확정됨
     const onOrient = () => {
-      // 100ms + 350ms 두 번 — iOS는 늦게 확정됨
+      updateSize();
       setTimeout(updateSize, 100);
-      setTimeout(updateSize, 350);
+      setTimeout(updateSize, 300);
+      setTimeout(updateSize, 600);
     };
+    // visualViewport resize도 잡기 (iOS Safari 정확도↑)
+    const vv = (window as any).visualViewport;
+    if (vv) vv.addEventListener('resize', updateSize);
     window.addEventListener('resize', updateSize);
     window.addEventListener('orientationchange', onOrient);
     return () => {
       window.removeEventListener('resize', updateSize);
       window.removeEventListener('orientationchange', onOrient);
+      const vv2 = (window as any).visualViewport;
+      if (vv2) vv2.removeEventListener('resize', updateSize);
     };
   }, []);
 
@@ -936,6 +949,12 @@ function GanttChart({ user, appId, onAppChange, onLogout }: { user: any; appId: 
 
     return (
       <div style={{height:'100dvh',width:'100%',maxWidth:'100vw',display:'flex',flexDirection:'column',background:'#0f0f1a',fontFamily:"'Pretendard',-apple-system,BlinkMacSystemFont,sans-serif",overflow:'hidden',boxSizing:'border-box'}}>
+        {/* 🔧 DEBUG — 나중에 제거 */}
+        <div style={{position:'fixed',bottom:80,left:8,zIndex:9999,background:'rgba(0,0,0,0.75)',color:'#4ade80',fontSize:10,padding:'4px 8px',borderRadius:6,pointerEvents:'none',lineHeight:1.6}}>
+          w={screenW} h={screenH} short={Math.min(screenW,screenH)}<br/>
+          device={deviceType} landscape={String(screenW>screenH)}<br/>
+          showGantt={String(showGantt)}
+        </div>
         <style>{`
           @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
           @keyframes spin{to{transform:rotate(360deg)}}
