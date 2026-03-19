@@ -1,4 +1,3 @@
-// src/App.tsx 전체 내용을 이걸로 교체하세요!
 const { createClient } = (window as any).supabase;
 const XLSX = (window as any).XLSX;
 import React, { useState, useEffect, useRef, useCallback } from 'react';
@@ -7,12 +6,10 @@ const SUPABASE_URL = 'https://tcmcrpszpbawgwolzuno.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_ktL_xVzsDjv3wmbrO8j0Tg_DP2vYBHO';
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
-// half 제거, week → quarter, day → month(캘린더)
 type ViewMode = 'year'|'quarter'|'month';
 
 const DAY_COL_W  = 28;
 
-// ── 분기 정의 ─────────────────────────────────────────────────
 const QUARTERS = [
   { label: '1Q', months: [1,2,3],  startWeek: 0,  weekCount: 13 },
   { label: '2Q', months: [4,5,6],  startWeek: 13, weekCount: 13 },
@@ -20,7 +17,6 @@ const QUARTERS = [
   { label: '4Q', months: [10,11,12], startWeek: 39, weekCount: 13 },
 ];
 
-// ── 2026년 대한민국 법정공휴일 + 대체공휴일 ────────────────────
 const KR_HOLIDAYS_2026: Record<string, string> = {
   '2026-01-01': '신정',
   '2026-02-16': '설날 전날',
@@ -43,7 +39,6 @@ const KR_HOLIDAYS_2026: Record<string, string> = {
   '2026-12-25': '크리스마스',
 };
 
-// ── 기기/화면 분류 ────────────────────────────────────────────
 const isTouchDevice = () => 'ontouchstart' in window || navigator.maxTouchPoints > 0;
 
 type DeviceType = 'phone' | 'tablet' | 'fold' | 'fold-open' | 'desktop';
@@ -78,11 +73,9 @@ const calcLayout = (mode: ViewMode, screenW: number, deviceType: string = 'deskt
     colW = Math.floor(availW / 12);
     totalTimelineW = colW * 12;
   } else if (mode === 'quarter') {
-    // 한 화면에 13주(1분기)가 딱 맞게 → availW ÷ 13
     colW = Math.max(40, Math.floor(availW / 13));
     totalTimelineW = colW * 52;
   } else {
-    // day
     colW = DAY_COL_W;
     totalTimelineW = DAY_COL_W * 365;
   }
@@ -106,7 +99,6 @@ const WEEK_HEADERS = (() => {
   }
   return items;
 })();
-
 
 const COLOR_MAP: Record<string, any> = {
   blue:   { bar:'#3b82f6', barLight:'#bfdbfe', text:'#1e40af', border:'#3b82f6', rowBg:'#f8faff' },
@@ -154,7 +146,7 @@ function LoginScreen({ onLogin }: { onLogin: (user: any) => void }) {
 
   return (
     <div style={{minHeight:'100dvh',background:'linear-gradient(135deg,#0f0f1a 0%,#1a1a2e 60%,#16213e 100%)',display:'flex',alignItems:'center',justifyContent:'center',fontFamily:"'Pretendard',-apple-system,BlinkMacSystemFont,sans-serif"}}>
-      <style>{`@import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css'); @keyframes spin{to{transform:rotate(360deg)}} *{box-sizing:border-box;}`}</style>
+      <style>{`@import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css'); @keyframes spin{to{transform:rotate(360deg)}} *{box-sizing:border-box;color-scheme:light;} html,body{color-scheme:light;}`}</style>
       <div style={{width:'100%',maxWidth:400,padding:'0 24px'}}>
         <div style={{textAlign:'center',marginBottom:40}}>
           <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:16,marginBottom:14}}>
@@ -251,7 +243,7 @@ function ResetPasswordScreen({ user, onDone }: { user: any; onDone: () => void }
 
   return (
     <div style={{minHeight:'100dvh',background:'linear-gradient(135deg,#0f0f1a 0%,#1a1a2e 60%,#16213e 100%)',display:'flex',alignItems:'center',justifyContent:'center',fontFamily:"'Pretendard',-apple-system,BlinkMacSystemFont,sans-serif"}}>
-      <style>{`@import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css'); @keyframes spin{to{transform:rotate(360deg)}} *{box-sizing:border-box;}`}</style>
+      <style>{`@import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css'); @keyframes spin{to{transform:rotate(360deg)}} *{box-sizing:border-box;color-scheme:light;} html,body{color-scheme:light;}`}</style>
       <div style={{width:'100%',maxWidth:400,padding:'0 24px'}}>
         <div style={{textAlign:'center',marginBottom:36}}>
           <div style={{width:56,height:56,borderRadius:16,background:'linear-gradient(135deg,#6366f1,#a855f7)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:28,margin:'0 auto 16px',boxShadow:'0 4px 20px rgba(99,102,241,0.4)'}}>🔑</div>
@@ -290,6 +282,140 @@ function ResetPasswordScreen({ user, onDone }: { user: any; onDone: () => void }
   );
 }
 
+const modalInp = (extra: any = {}) => ({width:'100%',maxWidth:'100%',border:'1px solid #d1d5db',borderRadius:8,padding:'8px 12px',fontSize:16,boxSizing:'border-box' as const,...extra});
+const modalDateInp = () => ({
+  width:'100%', maxWidth:'100%', boxSizing:'border-box' as const,
+  border:'1px solid #e5e7eb', borderRadius:10,
+  padding:'13px 14px', fontSize:16, fontWeight:500,
+  background:'#f8fafc', color:'#1e293b',
+  WebkitAppearance:'none' as any, appearance:'none' as any,
+  display:'block',
+});
+
+function ProjectEditModal({ proj, onClose, allGroups, updateProject }: any) {
+  const [fd, setFd] = useState({...proj});
+  const firstInputRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    const t = setTimeout(() => { firstInputRef.current?.focus(); }, 150);
+    return () => clearTimeout(t);
+  }, []);
+  return (
+    <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.6)',display:'flex',alignItems:'flex-end',justifyContent:'center',zIndex:50}} onClick={onClose}>
+      <div style={{background:'white',borderRadius:'16px 16px 0 0',width:'100%',maxWidth:560,maxHeight:'92dvh',display:'flex',flexDirection:'column',boxShadow:'0 -4px 32px rgba(0,0,0,0.25)'}} onClick={e=>e.stopPropagation()}>
+        <div style={{padding:'16px 20px 0',flexShrink:0}}>
+          <div style={{width:40,height:4,borderRadius:2,background:'#e5e7eb',margin:'0 auto 16px'}}/>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16}}>
+            <h3 style={{fontSize:18,fontWeight:'bold',margin:0}}>프로젝트 편집</h3>
+            <button onClick={onClose} style={{border:'none',background:'#f3f4f6',cursor:'pointer',fontSize:18,color:'#374151',width:36,height:36,borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center',fontWeight:700}}>✕</button>
+          </div>
+        </div>
+        <div style={{overflowY:'auto',flex:1,padding:'0 20px'}}>
+          <div style={{display:'flex',flexDirection:'column',gap:16,paddingBottom:8}}>
+            <div><label style={{display:'block',fontSize:14,fontWeight:500,marginBottom:4}}>프로젝트 이름</label><input ref={firstInputRef} value={fd.name} onChange={e=>setFd({...fd,name:e.target.value})} style={modalInp()} /></div>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
+              <div><label style={{display:'block',fontSize:14,fontWeight:500,marginBottom:4}}>오너 (정)</label><input value={fd.owner||''} onChange={e=>setFd({...fd,owner:e.target.value})} style={modalInp()} /></div>
+              <div><label style={{display:'block',fontSize:14,fontWeight:500,marginBottom:4}}>오너 (부)</label><input value={fd.subOwner||''} onChange={e=>setFd({...fd,subOwner:e.target.value})} style={modalInp()} /></div>
+            </div>
+            <div>
+              <label style={{display:'block',fontSize:14,fontWeight:500,marginBottom:8}}>그룹</label>
+              <div style={{display:'flex',gap:6,flexWrap:'wrap',marginBottom:8}}>
+                {allGroups.filter((g:any)=>g!=='미분류').map((g:any)=>(
+                  <button key={g} type="button" onClick={()=>setFd({...fd,group:g})}
+                    style={{padding:'6px 14px',borderRadius:20,fontSize:13,cursor:'pointer',fontWeight:fd.group===g?600:400,border:fd.group===g?'2px solid #6366f1':'2px solid #e5e7eb',background:fd.group===g?'#eef2ff':'white',color:fd.group===g?'#4338ca':'#6b7280'}}>{g}</button>
+                ))}
+                <button type="button" onClick={()=>setFd({...fd,group:''})}
+                  style={{padding:'6px 14px',borderRadius:20,fontSize:13,cursor:'pointer',fontWeight:fd.group===''||fd.group==='미분류'?600:400,border:fd.group===''||fd.group==='미분류'?'2px solid #9ca3af':'2px solid #e5e7eb',background:fd.group===''||fd.group==='미분류'?'#f3f4f6':'white',color:'#6b7280'}}>미분류</button>
+              </div>
+              <input value={(!allGroups.filter((g:any)=>g!=='미분류').includes(fd.group) && fd.group && fd.group!=='미분류') ? fd.group : ''} onChange={e=>setFd({...fd,group:e.target.value})} placeholder="+ 새 그룹 직접 입력" style={{...modalInp(),fontSize:13}} />
+            </div>
+            <div>
+              <label style={{display:'block',fontSize:14,fontWeight:500,marginBottom:8}}>주관부서</label>
+              <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+                {CATEGORIES.map((cat:any)=>{ const cc=CATEGORY_COLORS[cat]; return <button key={cat} onClick={()=>setFd({...fd,category:cat})} style={{padding:'6px 16px',borderRadius:20,border:`2px solid ${fd.category===cat?cc.border:'#e5e7eb'}`,background:fd.category===cat?cc.bg:'white',color:fd.category===cat?cc.text:'#6b7280',cursor:'pointer',fontSize:13,fontWeight:fd.category===cat?600:400}}>{cat}</button>; })}
+              </div>
+            </div>
+            <div>
+              <label style={{display:'block',fontSize:14,fontWeight:500,marginBottom:8}}>프로젝트 기간</label>
+              <div style={{display:'flex',flexDirection:'column',gap:10}}>
+                <div>
+                  <label style={{display:'block',fontSize:12,color:'#6366f1',fontWeight:600,marginBottom:5}}>시작일</label>
+                  <input type="date" value={fd.startDate||''} onChange={e=>setFd({...fd,startDate:e.target.value})} style={modalDateInp()} />
+                </div>
+                <div>
+                  <label style={{display:'block',fontSize:12,color:'#6366f1',fontWeight:600,marginBottom:5}}>종료일</label>
+                  <input type="date" value={fd.endDate||''} onChange={e=>setFd({...fd,endDate:e.target.value})} style={modalDateInp()} />
+                </div>
+              </div>
+            </div>
+            <div>
+              <label style={{display:'block',fontSize:14,fontWeight:500,marginBottom:4}}>진행률 <span style={{color:'#3b82f6',fontWeight:'bold',marginLeft:8}}>{fd.progress||0}%</span></label>
+              <input type="range" min="0" max="100" value={fd.progress||0} onChange={e=>setFd({...fd,progress:Number(e.target.value)})} style={{width:'100%'}} />
+            </div>
+            <div><label style={{display:'block',fontSize:14,fontWeight:500,marginBottom:4}}>설명</label><textarea value={fd.description||''} onChange={e=>setFd({...fd,description:e.target.value})} style={{...modalInp(),height:80,resize:'vertical'} as any} /></div>
+          </div>
+        </div>
+        <div style={{display:'flex',justifyContent:'flex-end',gap:8,padding:'16px 20px',borderTop:'1px solid #f1f5f9',flexShrink:0,background:'white'}}>
+          <button onClick={onClose} style={{padding:'12px 24px',border:'1px solid #d1d5db',borderRadius:10,background:'white',cursor:'pointer',fontSize:15,fontWeight:500}}>취소</button>
+          <button onClick={()=>{updateProject(proj.id,fd);onClose();}} style={{padding:'12px 24px',border:'none',borderRadius:10,background:'#3b82f6',color:'white',cursor:'pointer',fontSize:15,fontWeight:600}}>저장</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function TaskEditModal({ task, pid, onClose, updateTask }: any) {
+  const [fd, setFd] = useState({...task});
+  const firstInputRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    const t = setTimeout(() => { firstInputRef.current?.focus(); }, 150);
+    return () => clearTimeout(t);
+  }, []);
+  return (
+    <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.6)',display:'flex',alignItems:'flex-end',justifyContent:'center',zIndex:50}} onClick={onClose}>
+      <div style={{background:'white',borderRadius:'16px 16px 0 0',width:'100%',maxWidth:560,maxHeight:'92dvh',display:'flex',flexDirection:'column',boxShadow:'0 -4px 32px rgba(0,0,0,0.25)'}} onClick={e=>e.stopPropagation()}>
+        <div style={{padding:'16px 20px 0',flexShrink:0}}>
+          <div style={{width:40,height:4,borderRadius:2,background:'#e5e7eb',margin:'0 auto 16px'}}/>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16}}>
+            <h3 style={{fontSize:18,fontWeight:'bold',margin:0}}>Task 편집</h3>
+            <button onClick={onClose} style={{border:'none',background:'#f3f4f6',cursor:'pointer',fontSize:18,color:'#374151',width:36,height:36,borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center',fontWeight:700}}>✕</button>
+          </div>
+        </div>
+        <div style={{overflowY:'auto',flex:1,padding:'0 20px'}}>
+          <div style={{display:'flex',flexDirection:'column',gap:16,paddingBottom:8}}>
+            <div><label style={{display:'block',fontSize:14,fontWeight:500,marginBottom:4}}>Task 이름</label><input ref={firstInputRef} value={fd.name} onChange={e=>setFd({...fd,name:e.target.value})} style={modalInp()} /></div>
+            <div>
+              <label style={{display:'block',fontSize:14,fontWeight:500,marginBottom:8}}>업무유형</label>
+              <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+                {CATEGORIES.map((cat:any)=>{ const cc=CATEGORY_COLORS[cat]; return <button key={cat} onClick={()=>setFd({...fd,category:cat})} style={{padding:'6px 14px',borderRadius:20,border:`2px solid ${fd.category===cat?cc.border:'#e5e7eb'}`,background:fd.category===cat?cc.bg:'white',color:fd.category===cat?cc.text:'#6b7280',cursor:'pointer',fontSize:13,fontWeight:fd.category===cat?600:400}}>{cat}</button>; })}
+              </div>
+            </div>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
+              <div><label style={{display:'block',fontSize:14,fontWeight:500,marginBottom:4}}>담당자 (정)</label><input value={fd.assignee||''} onChange={e=>setFd({...fd,assignee:e.target.value})} style={modalInp()} /></div>
+              <div><label style={{display:'block',fontSize:14,fontWeight:500,marginBottom:4}}>담당자 (부)</label><input value={fd.subAssignee||''} onChange={e=>setFd({...fd,subAssignee:e.target.value})} style={modalInp()} /></div>
+            </div>
+            <div><label style={{display:'block',fontSize:14,fontWeight:500,marginBottom:4}}>설명</label><textarea value={fd.description||''} onChange={e=>setFd({...fd,description:e.target.value})} style={{...modalInp(),height:80,resize:'vertical'} as any} /></div>
+            <div style={{display:'flex',flexDirection:'column',gap:10}}>
+              <div>
+                <label style={{display:'block',fontSize:12,color:'#6366f1',fontWeight:600,marginBottom:5}}>시작일</label>
+                <input type="date" value={fd.startDate} onChange={e=>setFd({...fd,startDate:e.target.value})} style={modalDateInp()} />
+              </div>
+              <div>
+                <label style={{display:'block',fontSize:12,color:'#6366f1',fontWeight:600,marginBottom:5}}>종료일</label>
+                <input type="date" value={fd.endDate} onChange={e=>setFd({...fd,endDate:e.target.value})} style={modalDateInp()} />
+              </div>
+            </div>
+            <div><label style={{display:'block',fontSize:14,fontWeight:500,marginBottom:4}}>진행률: <span style={{color:'#3b82f6',fontWeight:'bold'}}>{fd.progress}%</span></label><input type="range" min="0" max="100" value={fd.progress} onChange={e=>setFd({...fd,progress:Number(e.target.value)})} style={{width:'100%'}} /></div>
+          </div>
+        </div>
+        <div style={{display:'flex',justifyContent:'flex-end',gap:8,padding:'16px 20px',borderTop:'1px solid #f1f5f9',flexShrink:0,background:'white'}}>
+          <button onClick={onClose} style={{padding:'12px 24px',border:'1px solid #d1d5db',borderRadius:10,background:'white',cursor:'pointer',fontSize:15,fontWeight:500}}>취소</button>
+          <button onClick={()=>{updateTask(pid,task.id,fd);onClose();}} style={{padding:'12px 24px',border:'none',borderRadius:10,background:'#3b82f6',color:'white',cursor:'pointer',fontSize:15,fontWeight:600}}>저장</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function GanttChart({ user, appId, onAppChange, onLogout }: { user: any; appId: 1|2; onAppChange: (id: 1|2) => void; onLogout: () => void }) {
   const APP_CONFIG = {
     1: { name: '샌디버스 간트차트', channel: 'gantt-bus-sync', csvPrefix: '샌디버스' },
@@ -297,7 +423,15 @@ function GanttChart({ user, appId, onAppChange, onLogout }: { user: any; appId: 
   };
   const currentApp = APP_CONFIG[appId];
 
-  const [viewMode, setViewMode] = useState<ViewMode>('year');
+  const [viewMode, setViewMode] = useState<ViewMode>(() => {
+    if (typeof window !== 'undefined' && ('ontouchstart' in window || navigator.maxTouchPoints > 0)) {
+      const w = window.innerWidth, h = window.innerHeight;
+      const short = Math.min(w,h), long = Math.max(w,h);
+      if (short >= 600 && long/short < 2.0) return 'year';
+      return 'month';
+    }
+    return 'year';
+  });
   const getW = () => window.innerWidth  || window.screen.width;
   const getH = () => window.innerHeight || window.screen.height;
   const [screenW, setScreenW] = useState(getW);
@@ -308,15 +442,9 @@ function GanttChart({ user, appId, onAppChange, onLogout }: { user: any; appId: 
       const vv = (window as any).visualViewport;
       const w = vv ? Math.round(vv.width)  : window.innerWidth  || window.screen.width;
       const h = vv ? Math.round(vv.height) : window.innerHeight || window.screen.height;
-      setScreenW(w);
-      setScreenH(h);
+      setScreenW(w); setScreenH(h);
     };
-    const onOrient = () => {
-      updateSize();
-      setTimeout(updateSize, 100);
-      setTimeout(updateSize, 300);
-      setTimeout(updateSize, 600);
-    };
+    const onOrient = () => { updateSize(); setTimeout(updateSize,100); setTimeout(updateSize,300); setTimeout(updateSize,600); };
     const vv = (window as any).visualViewport;
     if (vv) vv.addEventListener('resize', updateSize);
     window.addEventListener('resize', updateSize);
@@ -342,11 +470,7 @@ function GanttChart({ user, appId, onAppChange, onLogout }: { user: any; appId: 
   const TIMELINE_W   = layout.totalTimelineW;
 
   const GridLines = React.useMemo(() => (
-    <div style={{
-      position:'absolute',inset:0,pointerEvents:'none',zIndex:0,
-      backgroundImage:`repeating-linear-gradient(to right, transparent 0px, transparent ${MONTH_COL-1}px, #e8ecf8 ${MONTH_COL-1}px, #e8ecf8 ${MONTH_COL}px)`,
-      backgroundSize:`${MONTH_COL}px 100%`,
-    }} />
+    <div style={{position:'absolute',inset:0,pointerEvents:'none',zIndex:0,backgroundImage:`repeating-linear-gradient(to right, transparent 0px, transparent ${MONTH_COL-1}px, #e8ecf8 ${MONTH_COL-1}px, #e8ecf8 ${MONTH_COL}px)`,backgroundSize:`${MONTH_COL}px 100%`}} />
   ), [MONTH_COL]);
 
   const DayOverlayLines = null;
@@ -356,6 +480,9 @@ function GanttChart({ user, appId, onAppChange, onLogout }: { user: any; appId: 
   const V_TOTAL_DAYS = 365;
 
   const [projects, setProjects]               = useState<any[]>([]);
+  const [undoStack, setUndoStack]             = useState<any[][]>([]);   // ★ 추가
+  const [redoStack, setRedoStack]             = useState<any[][]>([]);   // ★ 추가
+  const MAX_UNDO = 20;                                                    // ★ 추가
   const [searchQuery, setSearchQuery]         = useState('');
   const [activeCategories, setActiveCategories] = useState<string[]>([]);
   const [activeGroup, setActiveGroup]         = useState('');
@@ -381,7 +508,10 @@ function GanttChart({ user, appId, onAppChange, onLogout }: { user: any; appId: 
   const [headerCollapsed, setHeaderCollapsed] = useState(false);
   const [uploadPreview, setUploadPreview]     = useState<any[]|null>(null);
   const [uploadError, setUploadError]         = useState<string>('');
-  const [calMonth, setCalMonth]               = useState<number>(() => new Date().getMonth() + 1); // 1~12
+  const [calMonth, setCalMonth]               = useState<number>(() => new Date().getMonth() + 1);
+
+  // ★ 앱별 UI 상태 세션 캐시 (앱 전환 시 유지용)
+  const uiCacheRef = useRef<Record<number, { collapsedGroups: string[]; expandedProjects: number[] }>>({});
 
   const dragRef      = useRef<any>(null);
   const rowDragRef   = useRef<any>(null);
@@ -397,8 +527,9 @@ function GanttChart({ user, appId, onAppChange, onLogout }: { user: any; appId: 
   const HISTORY_DEBOUNCE_MS = 5 * 60 * 1000;
 
   const projectsRef = useRef<any[]>([]);
+  const collapsedGroupsRef = useRef<Set<string>>(new Set());
   useEffect(() => { projectsRef.current = projects; }, [projects]);
-
+  useEffect(() => { collapsedGroupsRef.current = collapsedGroups; }, [collapsedGroups]);
   useEffect(() => { draggingRef.current = dragging; }, [dragging]);
   useEffect(() => { if (isPortrait) setHeaderCollapsed(false); }, [isPortrait]);
 
@@ -417,14 +548,11 @@ function GanttChart({ user, appId, onAppChange, onLogout }: { user: any; appId: 
     return () => el.removeEventListener("scroll", handler);
   }, [isPortrait]);
 
-  // ── 분기 점프 헬퍼 ───────────────────────────────────────────
   const jumpToQuarter = useCallback((qIndex: number) => {
     const el = chartScrollRef.current;
     if (!el) return;
     const q = QUARTERS[qIndex];
-    // MONTH_COL = 동적 colW (분기 모드에서 availW/13)
-    const targetScrollLeft = q.startWeek * MONTH_COL;
-    el.scrollTo({ left: targetScrollLeft, behavior: 'smooth' });
+    el.scrollTo({ left: q.startWeek * MONTH_COL, behavior: 'smooth' });
   }, [MONTH_COL]);
 
   const getPos = useCallback((s: string, e: string) => {
@@ -446,10 +574,7 @@ function GanttChart({ user, appId, onAppChange, onLogout }: { user: any; appId: 
       return { pos: null, progress: 0, startDate: '', endDate: '' };
     }
     let totalW = 0, totalP = 0;
-    tasks.forEach((t:any) => {
-      const dur = Math.max(1, (parseDate(t.endDate).getTime() - parseDate(t.startDate).getTime()) / 86400000);
-      totalW += dur; totalP += (t.progress || 0) * dur;
-    });
+    tasks.forEach((t:any) => { const dur = Math.max(1,(parseDate(t.endDate).getTime()-parseDate(t.startDate).getTime())/86400000); totalW+=dur; totalP+=(t.progress||0)*dur; });
     const starts = tasks.map((t:any) => +parseDate(t.startDate));
     const ends   = tasks.map((t:any) => +parseDate(t.endDate));
     const realStart = toDateStr(new Date(Math.min(...starts)));
@@ -463,17 +588,9 @@ function GanttChart({ user, appId, onAppChange, onLogout }: { user: any; appId: 
 
   const assignLanes = useCallback((tasks: any[]) => {
     const laneEnds: number[] = [];
-    const sorted = [...tasks]
-      .map((task, origIdx) => ({ task, origIdx, pos: getPos(task.startDate, task.endDate) }))
-      .filter(item => item.pos !== null)
-      .sort((a, b) => (a.task.startDate || '').localeCompare(b.task.startDate || ''));
+    const sorted = [...tasks].map((task, origIdx) => ({ task, origIdx, pos: getPos(task.startDate, task.endDate) })).filter(item => item.pos !== null).sort((a, b) => (a.task.startDate || '').localeCompare(b.task.startDate || ''));
     const laneMap: Record<number, number> = {};
-    sorted.forEach(({ origIdx, pos }) => {
-      const laneIdx = laneEnds.findIndex(end => end + BAR_GAP_PX <= pos!.left);
-      const lane = laneIdx === -1 ? laneEnds.length : laneIdx;
-      laneEnds[lane] = pos!.left + pos!.width;
-      laneMap[origIdx] = lane;
-    });
+    sorted.forEach(({ origIdx, pos }) => { const laneIdx = laneEnds.findIndex(end => end + BAR_GAP_PX <= pos!.left); const lane = laneIdx === -1 ? laneEnds.length : laneIdx; laneEnds[lane] = pos!.left + pos!.width; laneMap[origIdx] = lane; });
     return tasks.map((task, origIdx) => ({ task, lane: laneMap[origIdx] ?? 0, pos: getPos(task.startDate, task.endDate) }));
   }, [getPos]);
 
@@ -487,36 +604,21 @@ function GanttChart({ user, appId, onAppChange, onLogout }: { user: any; appId: 
     if (!validTasks.length) return 52;
     const laned = assignLanes(validTasks);
     const laneCount = calcLaneCount(laned);
-    const totalH = laneCount * (TASK_ROW_H + TASK_GAP) - TASK_GAP;
-    return Math.max(52, totalH + 12);
+    return Math.max(52, laneCount * (TASK_ROW_H + TASK_GAP) - TASK_GAP + 12);
   }, [assignLanes]);
 
   const saveHistorySnapshot = async (p: any[], memo?: string) => {
-    try {
-      await supabase.from('gantt_history').insert({
-        data: { app_id: appId, projects: p },
-        memo: memo || '',
-      });
-    } catch {}
+    try { await supabase.from('gantt_history').insert({ data: { app_id: appId, projects: p }, memo: memo || '' }); } catch {}
   };
 
   useEffect(() => {
     const handleUnload = () => {
       const snap = projectsRef.current;
       if (!snap.length) return;
-      const body = JSON.stringify({
-        data: { app_id: appId, projects: snap },
-        memo: '브라우저 종료',
-      });
       fetch(`${SUPABASE_URL}/rest/v1/gantt_history`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'apikey': SUPABASE_KEY,
-          'Authorization': `Bearer ${SUPABASE_KEY}`,
-          'Prefer': 'return=minimal',
-        },
-        body,
+        headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Prefer': 'return=minimal' },
+        body: JSON.stringify({ data: { app_id: appId, projects: snap }, memo: '브라우저 종료' }),
         keepalive: true,
       });
     };
@@ -524,11 +626,25 @@ function GanttChart({ user, appId, onAppChange, onLogout }: { user: any; appId: 
     return () => window.removeEventListener('beforeunload', handleUnload);
   }, [appId]);
 
+  const prevAppIdRef = useRef<number | null>(null); // ★ 초기값 null로 변경
+
   useEffect(() => {
+    const prevAppId = prevAppIdRef.current;
+
+    // ★ prevAppId가 null이면 최초 마운트 → 저장 안 함
+    if (prevAppId !== null) {
+      uiCacheRef.current[prevAppId] = {
+        collapsedGroups: Array.from(collapsedGroupsRef.current),
+        expandedProjects: projectsRef.current.filter(p => p.expanded).map(p => p.id),
+      };
+    }
+    prevAppIdRef.current = appId;
+
     setProjects([]);
-    // 앱 전환 시 년보기 + 전체 접기 초기화
-    setViewMode('year');
-    setCollapsedGroups(new Set(['__all__'])); // 로드 후 collapseAll 트리거용 sentinel
+    setUndoStack([]);
+    setRedoStack([]);
+    setViewMode(!showGantt ? 'month' : 'year');
+    setCollapsedGroups(new Set()); // load() 완료 후 덮어쓰므로 임시값 불필요
     load();
     const channel = supabase.channel(currentApp.channel)
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'gantt_projects', filter: `id=eq.${appId}` },
@@ -540,10 +656,7 @@ function GanttChart({ user, appId, onAppChange, onLogout }: { user: any; appId: 
           toastTimer.current = setTimeout(() => setRealtimeToast(false), 2500);
         })
       .subscribe();
-    return () => {
-      supabase.removeChannel(channel);
-      if (toastTimer.current) clearTimeout(toastTimer.current);
-    };
+    return () => { supabase.removeChannel(channel); if (toastTimer.current) clearTimeout(toastTimer.current); };
   }, [appId]);
 
   const load = async () => {
@@ -552,57 +665,85 @@ function GanttChart({ user, appId, onAppChange, onLogout }: { user: any; appId: 
       const { data, error } = await supabase.from('gantt_projects').select('data').eq('id', appId).single();
       if (!error && data) {
         const loaded: any[] = data.data || [];
-        // 로드 완료 시 모든 프로젝트 접기 + 모든 그룹 접기
-        const allGrps = Array.from(new Set(loaded.map((p: any) => p.group || '미분류')));
-        setCollapsedGroups(new Set(allGrps));
-        setProjects(loaded.map((p: any) => ({ ...p, expanded: false })));
+        const cache = uiCacheRef.current[appId];
+        if (cache) {
+          // ★ 캐시 있으면 이전 UI 상태 복원
+          const expandedSet = new Set(cache.expandedProjects);
+          setCollapsedGroups(new Set(cache.collapsedGroups));
+          setProjects(loaded.map((p: any) => ({ ...p, expanded: expandedSet.has(p.id) })));
+        } else {
+          // ★ 최초 접속 → 전체 접힘
+          const allGrps = Array.from(new Set(loaded.map((p: any) => p.group || '미분류')));
+          setCollapsedGroups(new Set(allGrps));
+          setProjects(loaded.map((p: any) => ({ ...p, expanded: false })));
+        }
       }
     } catch {}
     finally { setLoading(false); }
   };
 
-  const save = async (p: any[], memo?: string) => {
-    setProjects(p); setSaving(true); isSavingRef.current = true;
+  // ★ save 함수 - skipUndo 파라미터 추가
+  const save = async (p: any[], memo?: string, skipUndo = false) => {
+    if (!skipUndo) {
+      setUndoStack(prev => {
+        const next = [...prev, projectsRef.current];
+        return next.length > MAX_UNDO ? next.slice(next.length - MAX_UNDO) : next;
+      });
+      setRedoStack([]);
+    }
+    setProjects(p);
+    setSaving(true);
+    isSavingRef.current = true;
     try { await supabase.from('gantt_projects').upsert({ id: appId, data: p }); } catch {}
     finally { setSaving(false); setTimeout(() => { isSavingRef.current = false; }, 1000); }
     if (historyTimer.current) clearTimeout(historyTimer.current);
     historyTimer.current = setTimeout(() => saveHistorySnapshot(p, memo), HISTORY_DEBOUNCE_MS);
   };
 
-  const loadHistory = async () => {
-    setHistoryLoading(true); setShowHistory(true);
-    try {
-      const { data: raw } = await supabase
-        .from('gantt_history')
-        .select('id, saved_at, memo, data')
-        .order('saved_at', { ascending: false })
-        .limit(200);
-      const filtered = (raw || [])
-        .filter((h: any) => h.data?.app_id === appId)
-        .slice(0, 50);
-      setHistory(filtered);
-    } catch {}
-    finally { setHistoryLoading(false); }
-  };
+  // ★ undo 함수
+  const undo = useCallback(() => {
+    setUndoStack(prev => {
+      if (prev.length === 0) return prev;
+      const next = [...prev];
+      const target = next.pop()!;
+      setRedoStack(r => [...r, projectsRef.current]);
+      save(target, '실행 취소', true);
+      return next;
+    });
+  }, []);
 
-  const restoreHistory = async (id: number) => {
-    if (!confirm('이 시점으로 복원할까요?\n현재 데이터는 덮어쓰여집니다.')) return;
-    setRestoring(true);
-    try {
-      const { data } = await supabase.from('gantt_history').select('data').eq('id', id).single();
-      if (data) {
-        const restoredProjects = Array.isArray(data.data)
-          ? data.data
-          : (data.data?.projects ?? []);
-        setProjects(restoredProjects); setSaving(true);
-        try { await supabase.from('gantt_projects').upsert({ id: appId, data: restoredProjects }); } catch {}
-        finally { setSaving(false); }
-        await saveHistorySnapshot(restoredProjects, '복원됨');
-        setShowHistory(false); alert('복원 완료!');
+  // ★ redo 함수
+  const redo = useCallback(() => {
+    setRedoStack(prev => {
+      if (prev.length === 0) return prev;
+      const next = [...prev];
+      const target = next.pop()!;
+      setUndoStack(r => {
+        const ns = [...r, projectsRef.current];
+        return ns.length > MAX_UNDO ? ns.slice(ns.length - MAX_UNDO) : ns;
+      });
+      save(target, '다시 실행', true);
+      return next;
+    });
+  }, []);
+
+  // ★ Ctrl+Z / Ctrl+Y 키보드 단축키
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key === 'z') {
+        e.preventDefault();
+        undo();
       }
-    } catch { alert('복원 중 오류가 발생했습니다.'); }
-    finally { setRestoring(false); }
-  };
+      if (((e.ctrlKey || e.metaKey) && e.key === 'y') || ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'z')) {
+        e.preventDefault();
+        redo();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [undo, redo]);
 
   const addProject = () => save([...projects, { id:Date.now(), name:'새 프로젝트', owner:'', subOwner:'', description:'', color:'blue', expanded:true, tasks:[], category:'기획', group: activeGroup || '미분류', startDate:todayStr(), endDate:weekLaterStr(), progress:0 }]);
   const addTask = (pid: number) => save(projects.map(p => p.id !== pid ? p : { ...p, tasks:[...p.tasks, { id:Date.now(), name:'새 Task', assignee:'', subAssignee:'', startDate:todayStr(), endDate:weekLaterStr(), progress:0, dependencies:[], description:'', category: p.category||'' }] }));
@@ -615,18 +756,21 @@ function GanttChart({ user, appId, onAppChange, onLogout }: { user: any; appId: 
   const updateProject  = (pid: number, upd: any) => save(projects.map(p => p.id!==pid ? p : {...p,...upd}));
   const toggleGroup    = (g: string) => setCollapsedGroups(prev => {
     const next = new Set(prev);
-    if (next.has(g)) {
-      next.delete(g);
-      setProjects(ps => ps.map(p => (p.group||'미분류') === g ? {...p, expanded:false} : p));
-    } else {
-      next.add(g);
-    }
+    if (next.has(g)) { next.delete(g); setProjects(ps => ps.map(p => (p.group||'미분류') === g ? {...p, expanded:false} : p)); }
+    else { next.add(g); }
     return next;
   });
-  const renameGroup    = (oldName: string, newName: string) => { if (!newName.trim() || newName === oldName) return; save(projects.map(p => p.group === oldName ? {...p, group: newName.trim()} : p)); };
+  const renameGroup = (oldName: string, newName: string) => { if (!newName.trim() || newName === oldName) return; save(projects.map(p => p.group === oldName ? {...p, group: newName.trim()} : p)); };
 
   const handleMouseDown = (e: React.MouseEvent, pid: number, tid: any, type: string) => {
     e.preventDefault(); e.stopPropagation();
+    // ★ 드래그 시작 시 undo 스택에 현재 상태 push
+    setUndoStack(prev => {
+      const next = [...prev, projectsRef.current];
+      return next.length > MAX_UNDO ? next.slice(next.length - MAX_UNDO) : next;
+    });
+    setRedoStack([]);
+
     if (tid==='__proj__') {
       const proj = projects.find(p=>p.id===pid); if (!proj) return;
       dragRef.current = { pid, tid:'__proj__', type, startX:e.clientX, startDate:proj.startDate, endDate:proj.endDate };
@@ -684,7 +828,8 @@ function GanttChart({ user, appId, onAppChange, onLogout }: { user: any; appId: 
   const allGroups = [...groupOrder.filter(g => rawGroups.includes(g)), ...rawGroups.filter(g => !groupOrder.includes(g))];
 
   const filtered = projects
-    .filter(p => activeCategories.length===0 || activeCategories.includes(p.category))
+    .filter(p => { if (activeCategories.length === 0) return true; return p.tasks.some((t: any) => activeCategories.includes(t.category)); })
+    .map(p => { if (activeCategories.length === 0) return p; return { ...p, tasks: p.tasks.filter((t: any) => activeCategories.includes(t.category)) }; })
     .filter(p => activeGroup==='' || (p.group||'미분류')===activeGroup)
     .filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase()) || p.owner?.toLowerCase().includes(searchQuery.toLowerCase()) || p.tasks.some((t:any)=>t.name.toLowerCase().includes(searchQuery.toLowerCase())||t.assignee?.toLowerCase().includes(searchQuery.toLowerCase())));
 
@@ -726,9 +871,9 @@ function GanttChart({ user, appId, onAppChange, onLogout }: { user: any; appId: 
   };
 
   const exportXLSX = () => {
-    const headers = ['그룹','카테고리','프로젝트','오너(정)','부오너(부)','프로젝트 시작일','프로젝트 종료일','프로젝트 진행률','프로젝트 설명','Task','Task 설명','담당자(정)','부담당자(부)','Task 시작일','Task 종료일','Task 진행률'];
+    const headers = ['그룹','업무유형','프로젝트','오너(정)','부오너(부)','프로젝트 시작일','프로젝트 종료일','프로젝트 진행률','프로젝트 설명','Task','Task 설명','담당자(정)','부담당자(부)','Task 시작일','Task 종료일','Task 진행률'];
     const rows: any[][] = [];
-    projects.filter(p => activeCategories.length===0 || activeCategories.includes(p.category)).forEach(proj => {
+    projects.filter(p => activeCategories.length===0 || p.tasks.some((t:any) => activeCategories.includes(t.category))).map(p => activeCategories.length===0 ? p : {...p, tasks: p.tasks.filter((t:any) => activeCategories.includes(t.category))}).forEach(proj => {
       const { progress: projProg } = getProjectMeta(proj);
       const base = [proj.group||'미분류', proj.category||'', proj.name, proj.owner||'', proj.subOwner||'', proj.startDate||'', proj.endDate||'', `${projProg}%`, proj.description||''];
       if (proj.tasks.length === 0) rows.push([...base, '', '', '', '', '', '', '']);
@@ -736,24 +881,15 @@ function GanttChart({ user, appId, onAppChange, onLogout }: { user: any; appId: 
     });
     const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
     const range = XLSX.utils.decode_range(ws['!ref']||'A1');
-    for (let c = range.s.c; c <= range.e.c; c++) {
-      const cell = ws[XLSX.utils.encode_cell({r:0, c})];
-      if (cell) cell.s = { font: { bold: true }, fill: { fgColor: { rgb: 'EFF6FF' } }, alignment: { horizontal: 'center' } };
-    }
-    ws['!cols'] = headers.map((h, i) => {
-      const maxLen = Math.max(h.length, ...rows.map(r => String(r[i]||'').length));
-      return { wch: Math.min(Math.max(maxLen + 2, 10), 40) };
-    });
+    for (let c = range.s.c; c <= range.e.c; c++) { const cell = ws[XLSX.utils.encode_cell({r:0, c})]; if (cell) cell.s = { font: { bold: true }, fill: { fgColor: { rgb: 'EFF6FF' } }, alignment: { horizontal: 'center' } }; }
+    ws['!cols'] = headers.map((h, i) => { const maxLen = Math.max(h.length, ...rows.map(r => String(r[i]||'').length)); return { wch: Math.min(Math.max(maxLen + 2, 10), 40) }; });
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, '간트차트');
     XLSX.writeFile(wb, `${currentApp.csvPrefix}_간트차트_${new Date().toISOString().slice(0,10)}.xlsx`);
   };
 
   const handleImportXLSX = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    e.target.value = '';
-    if (!file) return;
-    setUploadError('');
+    const file = e.target.files?.[0]; e.target.value = ''; if (!file) return; setUploadError('');
     const reader = new FileReader();
     reader.onload = (ev) => {
       try {
@@ -764,213 +900,55 @@ function GanttChart({ user, appId, onAppChange, onLogout }: { user: any; appId: 
         if (rows.length < 2) { setUploadError('데이터가 없습니다.'); return; }
         const header = rows[0] as string[];
         const hi = (name: string) => header.findIndex(h => String(h).trim() === name);
-        const iGrp=hi('그룹'), iCat=hi('카테고리'), iProj=hi('프로젝트'), iOwn=hi('오너(정)'), iSub=hi('부오너(부)');
+        const iGrp=hi('그룹'), iCat=hi('업무유형'), iProj=hi('프로젝트'), iOwn=hi('오너(정)'), iSub=hi('부오너(부)');
         const iPSD=hi('프로젝트 시작일'), iPED=hi('프로젝트 종료일'), iPProg=hi('프로젝트 진행률'), iPDesc=hi('프로젝트 설명');
         const iTask=hi('Task'), iTDesc=hi('Task 설명'), iAss=hi('담당자(정)'), iSAss=hi('부담당자(부)');
         const iTSD=hi('Task 시작일'), iTED=hi('Task 종료일'), iTProg=hi('Task 진행률');
         if (iProj === -1) { setUploadError('헤더 형식이 맞지 않습니다. Excel 다운로드 양식을 사용해주세요.'); return; }
-        const projMap: Record<string, any> = {};
-        const projOrder: string[] = [];
+        const projMap: Record<string, any> = {}; const projOrder: string[] = [];
         for (let i = 1; i < rows.length; i++) {
-          const r = rows[i];
-          const projName = String(r[iProj]||'').trim();
-          if (!projName) continue;
+          const r = rows[i]; const projName = String(r[iProj]||'').trim(); if (!projName) continue;
           const key = `${String(r[iGrp]||'미분류').trim()}__${projName}`;
-          if (!projMap[key]) {
-            projOrder.push(key);
-            projMap[key] = {
-              id: Date.now() + Math.random(),
-              name: projName,
-              group: String(r[iGrp]||'미분류').trim(),
-              category: String(r[iCat]||'').trim(),
-              owner: String(r[iOwn]||'').trim(),
-              subOwner: String(r[iSub]||'').trim(),
-              startDate: String(r[iPSD]||'').trim(),
-              endDate: String(r[iPED]||'').trim(),
-              progress: parseInt(String(r[iPProg]||'0').replace('%',''))||0,
-              description: String(r[iPDesc]||'').trim(),
-              color: 'blue', expanded: true, tasks: [],
-            };
-          }
+          if (!projMap[key]) { projOrder.push(key); projMap[key] = { id: Date.now() + Math.random(), name: projName, group: String(r[iGrp]||'미분류').trim(), category: String(r[iCat]||'').trim(), owner: String(r[iOwn]||'').trim(), subOwner: String(r[iSub]||'').trim(), startDate: String(r[iPSD]||'').trim(), endDate: String(r[iPED]||'').trim(), progress: parseInt(String(r[iPProg]||'0').replace('%',''))||0, description: String(r[iPDesc]||'').trim(), color: 'blue', expanded: true, tasks: [] }; }
           const taskName = String(r[iTask]||'').trim();
-          if (taskName) {
-            projMap[key].tasks.push({
-              id: Date.now() + Math.random(),
-              name: taskName,
-              description: String(r[iTDesc]||'').trim(),
-              assignee: String(r[iAss]||'').trim(),
-              subAssignee: String(r[iSAss]||'').trim(),
-              startDate: String(r[iTSD]||'').trim(),
-              endDate: String(r[iTED]||'').trim(),
-              progress: parseInt(String(r[iTProg]||'0').replace('%',''))||0,
-              category: String(r[iCat]||'').trim(),
-              dependencies: [],
-            });
-          }
+          if (taskName) { projMap[key].tasks.push({ id: Date.now() + Math.random(), name: taskName, description: String(r[iTDesc]||'').trim(), assignee: String(r[iAss]||'').trim(), subAssignee: String(r[iSAss]||'').trim(), startDate: String(r[iTSD]||'').trim(), endDate: String(r[iTED]||'').trim(), progress: parseInt(String(r[iTProg]||'0').replace('%',''))||0, category: String(r[iCat]||'').trim(), dependencies: [] }); }
         }
         const parsed = projOrder.map(k => projMap[k]);
         if (parsed.length === 0) { setUploadError('파싱된 프로젝트가 없습니다.'); return; }
         setUploadPreview(parsed);
-      } catch(err) {
-        setUploadError('파일 파싱 중 오류가 발생했습니다.');
-      }
+      } catch { setUploadError('파일 파싱 중 오류가 발생했습니다.'); }
     };
     reader.readAsArrayBuffer(file);
   };
 
-  const confirmImport = () => {
-    if (!uploadPreview) return;
-    save([...projects, ...uploadPreview]);
-    setUploadPreview(null);
-  };
+  const confirmImport = () => { if (!uploadPreview) return; save([...projects, ...uploadPreview]); setUploadPreview(null); };
 
   const today = new Date();
   const todayLeft = today>=V_START && today<=V_END ? Math.round((today.getTime()-V_START.getTime())/86400000/V_TOTAL_DAYS*TIMELINE_W) : null;
-  const inp = (extra={}) => ({width:'100%',maxWidth:'100%',border:'1px solid #d1d5db',borderRadius:8,padding:'8px 12px',fontSize:14,boxSizing:'border-box' as const,...extra});
+  const descLineStyle: React.CSSProperties = { fontSize:12, color:'#6b7280', overflow:'hidden', textOverflow:'ellipsis', display:'-webkit-box', WebkitLineClamp:2, WebkitBoxOrient:'vertical', whiteSpace:'normal', marginTop:2, lineHeight:'14px', cursor:'default' };
 
-  const descLineStyle: React.CSSProperties = {
-    fontSize: 12,
-    color: '#6b7280',
-    overflow: 'hidden',
-    textOverflow: 'ellipsis',
-    display: '-webkit-box',
-    WebkitLineClamp: 2,
-    WebkitBoxOrient: 'vertical',
-    whiteSpace: 'normal',
-    marginTop: 2,
-    lineHeight: '14px',
-    cursor: 'default',
-  };
-
-  // ── 뷰모드 전환 헬퍼 (스크롤 비율 유지) ────────────────────
   const switchViewMode = (mode: ViewMode) => {
     const el = chartScrollRef.current;
     if (el) {
       const ratio = el.scrollLeft / (el.scrollWidth - el.clientWidth || 1);
       setViewMode(mode);
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          if (chartScrollRef.current) {
-            const newMax = chartScrollRef.current.scrollWidth - chartScrollRef.current.clientWidth;
-            chartScrollRef.current.scrollLeft = ratio * newMax;
-          }
-        });
-      });
-    } else {
-      setViewMode(mode);
-    }
+      requestAnimationFrame(() => { requestAnimationFrame(() => { if (chartScrollRef.current) { const newMax = chartScrollRef.current.scrollWidth - chartScrollRef.current.clientWidth; chartScrollRef.current.scrollLeft = ratio * newMax; } }); });
+    } else { setViewMode(mode); }
   };
 
-  const ProjectEditModal = ({ proj, onClose }: any) => {
-    const [fd, setFd] = useState({...proj});
-    const overlayRef = React.useRef<HTMLDivElement>(null);
-    React.useEffect(() => {
-      const el = overlayRef.current;
-      if (!el) return;
-      const prevent = (e: TouchEvent) => { if ((e.target as HTMLElement).closest('.modal-scroll')) return; e.preventDefault(); };
-      el.addEventListener('touchmove', prevent, { passive: false });
-      return () => el.removeEventListener('touchmove', prevent);
-    }, []);
-    return (
-      <div ref={overlayRef} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.6)',display:'flex',alignItems:'flex-end',justifyContent:'center',zIndex:50}} onClick={onClose}>
-        <div className="modal-scroll" style={{background:'white',borderRadius:'16px 16px 0 0',padding:'20px 20px 32px',width:'100%',maxWidth:560,maxHeight:'92dvh',overflowY:'auto',WebkitOverflowScrolling:'touch' as any,boxShadow:'0 -4px 32px rgba(0,0,0,0.25)'}} onClick={e=>e.stopPropagation()}>
-          <div style={{width:40,height:4,borderRadius:2,background:'#e5e7eb',margin:'0 auto 20px'}}/>
-          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:20}}>
-            <h3 style={{fontSize:18,fontWeight:'bold',margin:0}}>프로젝트 편집</h3>
-            <button onClick={onClose} style={{border:'none',background:'none',cursor:'pointer',fontSize:20,color:'#9ca3af'}}>✕</button>
-          </div>
-          <div style={{display:'flex',flexDirection:'column',gap:16}}>
-            <div><label style={{display:'block',fontSize:14,fontWeight:500,marginBottom:4}}>프로젝트 이름</label><input value={fd.name} onChange={e=>setFd({...fd,name:e.target.value})} style={inp()} /></div>
-            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
-              <div><label style={{display:'block',fontSize:14,fontWeight:500,marginBottom:4}}>오너 (정)</label><input value={fd.owner||''} onChange={e=>setFd({...fd,owner:e.target.value})} style={inp()} /></div>
-              <div><label style={{display:'block',fontSize:14,fontWeight:500,marginBottom:4}}>오너 (부)</label><input value={fd.subOwner||''} onChange={e=>setFd({...fd,subOwner:e.target.value})} style={inp()} /></div>
-            </div>
-            <div>
-              <label style={{display:'block',fontSize:14,fontWeight:500,marginBottom:8}}>그룹</label>
-              <div style={{display:'flex',gap:6,flexWrap:'wrap',marginBottom:8}}>
-                {allGroups.filter(g=>g!=='미분류').map(g=>(
-                  <button key={g} type="button" onClick={()=>setFd({...fd,group:g})}
-                    style={{padding:'6px 14px',borderRadius:20,fontSize:13,cursor:'pointer',fontWeight:fd.group===g?600:400,border:fd.group===g?'2px solid #6366f1':'2px solid #e5e7eb',background:fd.group===g?'#eef2ff':'white',color:fd.group===g?'#4338ca':'#6b7280'}}>{g}</button>
-                ))}
-                <button type="button" onClick={()=>setFd({...fd,group:''})}
-                  style={{padding:'6px 14px',borderRadius:20,fontSize:13,cursor:'pointer',fontWeight:fd.group===''||fd.group==='미분류'?600:400,border:fd.group===''||fd.group==='미분류'?'2px solid #9ca3af':'2px solid #e5e7eb',background:fd.group===''||fd.group==='미분류'?'#f3f4f6':'white',color:'#6b7280'}}>미분류</button>
-              </div>
-              <input value={(!allGroups.filter(g=>g!=='미분류').includes(fd.group) && fd.group && fd.group!=='미분류') ? fd.group : ''} onChange={e=>setFd({...fd,group:e.target.value})} placeholder="+ 새 그룹 직접 입력" style={{...inp(),fontSize:13}} />
-            </div>
-            <div>
-              <label style={{display:'block',fontSize:14,fontWeight:500,marginBottom:8}}>카테고리</label>
-              <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
-                {CATEGORIES.map(cat=>{ const cc=CATEGORY_COLORS[cat]; return <button key={cat} onClick={()=>setFd({...fd,category:cat})} style={{padding:'6px 16px',borderRadius:20,border:`2px solid ${fd.category===cat?cc.border:'#e5e7eb'}`,background:fd.category===cat?cc.bg:'white',color:fd.category===cat?cc.text:'#6b7280',cursor:'pointer',fontSize:13,fontWeight:fd.category===cat?600:400}}>{cat}</button>; })}
-              </div>
-            </div>
-            <div>
-              <label style={{display:'block',fontSize:14,fontWeight:500,marginBottom:8}}>프로젝트 기간</label>
-              <div style={{display:'flex',flexDirection:'column',gap:8}}>
-                <div><label style={{display:'block',fontSize:12,color:'#6b7280',marginBottom:4}}>시작일</label><input type="date" value={fd.startDate||''} onChange={e=>setFd({...fd,startDate:e.target.value})} style={inp()} /></div>
-                <div><label style={{display:'block',fontSize:12,color:'#6b7280',marginBottom:4}}>종료일</label><input type="date" value={fd.endDate||''} onChange={e=>setFd({...fd,endDate:e.target.value})} style={inp()} /></div>
-              </div>
-            </div>
-            <div>
-              <label style={{display:'block',fontSize:14,fontWeight:500,marginBottom:4}}>진행률 <span style={{color:'#3b82f6',fontWeight:'bold',marginLeft:8}}>{fd.progress||0}%</span></label>
-              <input type="range" min="0" max="100" value={fd.progress||0} onChange={e=>setFd({...fd,progress:Number(e.target.value)})} style={{width:'100%'}} />
-            </div>
-            <div><label style={{display:'block',fontSize:14,fontWeight:500,marginBottom:4}}>설명</label><textarea value={fd.description||''} onChange={e=>setFd({...fd,description:e.target.value})} style={{...inp(),height:80,resize:'vertical'} as any} /></div>
-          </div>
-          <div style={{display:'flex',justifyContent:'flex-end',gap:8,marginTop:24}}>
-            <button onClick={onClose} style={{padding:'10px 20px',border:'1px solid #d1d5db',borderRadius:8,background:'white',cursor:'pointer',fontSize:14}}>취소</button>
-            <button onClick={()=>{updateProject(proj.id,fd);onClose();}} style={{padding:'10px 20px',border:'none',borderRadius:8,background:'#3b82f6',color:'white',cursor:'pointer',fontSize:14,fontWeight:500}}>저장</button>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-  const TaskEditModal = ({ task, pid, onClose }: any) => {
-    const [fd, setFd] = useState({...task});
-    const overlayRef = React.useRef<HTMLDivElement>(null);
-    React.useEffect(() => {
-      const el = overlayRef.current;
-      if (!el) return;
-      const prevent = (e: TouchEvent) => { if ((e.target as HTMLElement).closest('.modal-scroll')) return; e.preventDefault(); };
-      el.addEventListener('touchmove', prevent, { passive: false });
-      return () => el.removeEventListener('touchmove', prevent);
-    }, []);
-    return (
-      <div ref={overlayRef} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.6)',display:'flex',alignItems:'flex-end',justifyContent:'center',zIndex:50}} onClick={onClose}>
-        <div className="modal-scroll" style={{background:'white',borderRadius:'16px 16px 0 0',padding:'20px 20px 32px',width:'100%',maxWidth:560,maxHeight:'92dvh',overflowY:'auto',WebkitOverflowScrolling:'touch' as any,boxShadow:'0 -4px 32px rgba(0,0,0,0.25)'}} onClick={e=>e.stopPropagation()}>
-          <div style={{width:40,height:4,borderRadius:2,background:'#e5e7eb',margin:'0 auto 20px'}}/>
-          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:20}}>
-            <h3 style={{fontSize:18,fontWeight:'bold',margin:0}}>Task 편집</h3>
-            <button onClick={onClose} style={{border:'none',background:'none',cursor:'pointer',fontSize:20,color:'#9ca3af'}}>✕</button>
-          </div>
-          <div style={{display:'flex',flexDirection:'column',gap:16}}>
-            <div><label style={{display:'block',fontSize:14,fontWeight:500,marginBottom:4}}>Task 이름</label><input value={fd.name} onChange={e=>setFd({...fd,name:e.target.value})} style={inp()} /></div>
-            <div>
-              <label style={{display:'block',fontSize:14,fontWeight:500,marginBottom:8}}>카테고리</label>
-              <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
-                <button onClick={()=>setFd({...fd,category:''})} style={{padding:'6px 14px',borderRadius:20,border:`2px solid ${!fd.category?'#6b7280':'#e5e7eb'}`,background:!fd.category?'#f3f4f6':'white',color:!fd.category?'#374151':'#9ca3af',cursor:'pointer',fontSize:13,fontWeight:!fd.category?600:400}}>없음</button>
-                {CATEGORIES.map(cat=>{ const cc=CATEGORY_COLORS[cat]; return <button key={cat} onClick={()=>setFd({...fd,category:cat})} style={{padding:'6px 14px',borderRadius:20,border:`2px solid ${fd.category===cat?cc.border:'#e5e7eb'}`,background:fd.category===cat?cc.bg:'white',color:fd.category===cat?cc.text:'#6b7280',cursor:'pointer',fontSize:13,fontWeight:fd.category===cat?600:400}}>{cat}</button>; })}
-              </div>
-            </div>
-            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
-              <div><label style={{display:'block',fontSize:14,fontWeight:500,marginBottom:4}}>담당자 (정)</label><input value={fd.assignee||''} onChange={e=>setFd({...fd,assignee:e.target.value})} style={inp()} /></div>
-              <div><label style={{display:'block',fontSize:14,fontWeight:500,marginBottom:4}}>담당자 (부)</label><input value={fd.subAssignee||''} onChange={e=>setFd({...fd,subAssignee:e.target.value})} style={inp()} /></div>
-            </div>
-            <div><label style={{display:'block',fontSize:14,fontWeight:500,marginBottom:4}}>설명</label><textarea value={fd.description||''} onChange={e=>setFd({...fd,description:e.target.value})} style={{...inp(),height:80,resize:'vertical'} as any} /></div>
-            <div style={{display:'flex',flexDirection:'column',gap:8}}>
-              <div><label style={{display:'block',fontSize:14,fontWeight:500,marginBottom:4}}>시작일</label><input type="date" value={fd.startDate} onChange={e=>setFd({...fd,startDate:e.target.value})} style={inp()} /></div>
-              <div><label style={{display:'block',fontSize:14,fontWeight:500,marginBottom:4}}>종료일</label><input type="date" value={fd.endDate} onChange={e=>setFd({...fd,endDate:e.target.value})} style={inp()} /></div>
-            </div>
-            <div><label style={{display:'block',fontSize:14,fontWeight:500,marginBottom:4}}>진행률: <span style={{color:'#3b82f6',fontWeight:'bold'}}>{fd.progress}%</span></label><input type="range" min="0" max="100" value={fd.progress} onChange={e=>setFd({...fd,progress:Number(e.target.value)})} style={{width:'100%'}} /></div>
-          </div>
-          <div style={{display:'flex',justifyContent:'flex-end',gap:8,marginTop:24}}>
-            <button onClick={onClose} style={{padding:'10px 20px',border:'1px solid #d1d5db',borderRadius:8,background:'white',cursor:'pointer',fontSize:14}}>취소</button>
-            <button onClick={()=>{updateTask(pid,task.id,fd);onClose();}} style={{padding:'10px 20px',border:'none',borderRadius:8,background:'#3b82f6',color:'white',cursor:'pointer',fontSize:14,fontWeight:500}}>저장</button>
-          </div>
-        </div>
-      </div>
-    );
-  };
+  // ★ undo/redo 버튼 공통 스타일 헬퍼
+  const undoBtnStyle = (active: boolean, size: 'sm'|'md' = 'md') => ({
+    width: size==='sm' ? 26 : 32,
+    height: size==='sm' ? 26 : 32,
+    borderRadius: size==='sm' ? 5 : 6,
+    border: 'none',
+    background: active ? 'rgba(99,102,241,0.25)' : 'transparent',
+    color: active ? '#c7d2fe' : 'rgba(148,163,184,0.25)',
+    cursor: active ? 'pointer' : 'not-allowed',
+    fontSize: size==='sm' ? 14 : 16,
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    transition: 'all 0.15s',
+  });
 
   const ChangePwModal = () => {
     const [currentPw, setCurrentPw] = useState('');
@@ -996,7 +974,7 @@ function GanttChart({ user, appId, onAppChange, onLogout }: { user: any; appId: 
     };
     const inp2 = () => ({width:'100%',border:'1px solid #d1d5db',borderRadius:8,padding:'9px 12px',fontSize:14,boxSizing:'border-box' as const,outline:'none'});
     return (
-      <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:50,padding:16,overscrollBehavior:'none',WebkitOverflowScrolling:'touch' as any}} onClick={()=>setShowChangePw(false)}>
+      <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:50,padding:16}} onClick={()=>setShowChangePw(false)}>
         <div style={{background:'white',borderRadius:14,padding:28,width:Math.min(400,window.innerWidth*0.95),boxShadow:'0 20px 60px rgba(0,0,0,0.3)'}} onClick={e=>e.stopPropagation()}>
           <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:20}}>
             <div><h3 style={{margin:0,fontSize:17,fontWeight:'bold'}}>🔑 비밀번호 변경</h3><p style={{margin:'4px 0 0',fontSize:12,color:'#9ca3af'}}>{user.email}</p></div>
@@ -1019,14 +997,12 @@ function GanttChart({ user, appId, onAppChange, onLogout }: { user: any; appId: 
   };
 
   const HistoryModal = () => (
-    <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:50,padding:16,overscrollBehavior:'none',WebkitOverflowScrolling:'touch' as any}} onClick={()=>setShowHistory(false)}>
+    <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:50,padding:16}} onClick={()=>setShowHistory(false)}>
       <div style={{background:'white',borderRadius:12,padding:24,width:Math.min(480, window.innerWidth*0.95),maxHeight:'75vh',display:'flex',flexDirection:'column',boxShadow:'0 20px 60px rgba(0,0,0,0.3)'}} onClick={e=>e.stopPropagation()}>
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16,flexShrink:0}}>
           <div>
             <h3 style={{margin:0,fontSize:18,fontWeight:'bold'}}>🕐 저장 히스토리</h3>
-            <p style={{margin:'4px 0 0',fontSize:12,color:'#9ca3af'}}>
-              {APP_CONFIG[appId].csvPrefix} · 최근 50개 스냅샷
-            </p>
+            <p style={{margin:'4px 0 0',fontSize:12,color:'#9ca3af'}}>{APP_CONFIG[appId].csvPrefix} · 최근 50개 스냅샷</p>
           </div>
           <button onClick={()=>setShowHistory(false)} style={{border:'none',background:'none',cursor:'pointer',fontSize:20,color:'#9ca3af',flexShrink:0}}>✕</button>
         </div>
@@ -1056,19 +1032,268 @@ function GanttChart({ user, appId, onAppChange, onLogout }: { user: any; appId: 
     </div>
   );
 
+  const loadHistory = async () => {
+    setHistoryLoading(true); setShowHistory(true);
+    try {
+      const { data: raw } = await supabase.from('gantt_history').select('id, saved_at, memo, data').order('saved_at', { ascending: false }).limit(200);
+      const filtered2 = (raw || []).filter((h: any) => h.data?.app_id === appId).slice(0, 50);
+      setHistory(filtered2);
+    } catch {}
+    finally { setHistoryLoading(false); }
+  };
+
+  const restoreHistory = async (id: number) => {
+    if (!confirm('이 시점으로 복원할까요?\n현재 데이터는 덮어쓰여집니다.')) return;
+    setRestoring(true);
+    try {
+      const { data } = await supabase.from('gantt_history').select('data').eq('id', id).single();
+      if (data) {
+        const restoredProjects = Array.isArray(data.data) ? data.data : (data.data?.projects ?? []);
+        setProjects(restoredProjects); setSaving(true);
+        try { await supabase.from('gantt_projects').upsert({ id: appId, data: restoredProjects }); } catch {}
+        finally { setSaving(false); }
+        await saveHistorySnapshot(restoredProjects, '복원됨');
+        setShowHistory(false); alert('복원 완료!');
+      }
+    } catch { alert('복원 중 오류가 발생했습니다.'); }
+    finally { setRestoring(false); }
+  };
+
   if (loading) return (
     <div style={{display:'flex',alignItems:'center',justifyContent:'center',height:'100dvh',flexDirection:'column',gap:12,color:'#6b7280'}}>
       <div style={{width:32,height:32,border:'4px solid #93c5fd',borderTopColor:'transparent',borderRadius:'50%',animation:'spin 0.8s linear infinite'}} />
       <p style={{fontSize:14,margin:0}}>Supabase에서 불러오는 중...</p>
-      <style>{`@import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css'); @keyframes spin{to{transform:rotate(360deg)}}`}</style>
+      <style>{`@import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css'); @keyframes spin{to{transform:rotate(360deg)}} *{color-scheme:light;} html,body{color-scheme:light;}`}</style>
     </div>
   );
 
   const totalW = LEFT_COL + ASSIGNEE_COL + SUB_COL + TIMELINE_W;
 
-  // ────────────────────────────────────────────────────────────
-  // 모바일 / 태블릿 세로 → 카드형 뷰
-  // ────────────────────────────────────────────────────────────
+  const MonthCalendarView = ({ calMonth, setCalMonth, filtered, todayStr2, onEditTask, allGroups, isDesktop }: any) => {
+    const [localTooltip, setLocalTooltip] = React.useState<any>(null);
+    const [localTooltipPos, setLocalTooltipPos] = React.useState({ x:0, y:0 });
+    const localTooltipTimer = React.useRef<ReturnType<typeof setTimeout>|null>(null);
+    const [selectedGroups, setSelectedGroups] = React.useState<string[]>([]);
+    const [groupDropOpen, setGroupDropOpen] = React.useState(false);
+    const groupDropRef = React.useRef<HTMLDivElement>(null);
+
+    React.useEffect(() => {
+      const handler = (e: MouseEvent) => { if (groupDropRef.current && !groupDropRef.current.contains(e.target as Node)) setGroupDropOpen(false); };
+      document.addEventListener('mousedown', handler);
+      return () => document.removeEventListener('mousedown', handler);
+    }, []);
+
+    const groupFiltered = (selectedGroups.length === 0 ? filtered : filtered.filter((p: any) => selectedGroups.includes(p.group || '미분류'))).filter((p: any) => p.category !== '영업');
+    const WEEKDAYS_ALL = ['일','월','화','수','목','금','토'];
+    const year = 2026;
+    const GRID_COLS = '0.3fr 1fr 1fr 1fr 1fr 1fr 0.3fr';
+    const SAT_SUN_RATIO = 0.3;
+    const TOTAL_UNITS = SAT_SUN_RATIO + 5 + SAT_SUN_RATIO;
+
+    const getDaysInMonth = (m: number) => {
+      const days: { date: Date; dateStr: string; isToday: boolean; isHoliday: boolean; holidayName: string; dow: number }[] = [];
+      const firstDay = new Date(year, m - 1, 1); const lastDay = new Date(year, m, 0);
+      for (let d = new Date(firstDay); d <= lastDay; d.setDate(d.getDate() + 1)) {
+        const dow = d.getDay(); const ds = toDateStr(new Date(d));
+        days.push({ date: new Date(d), dateStr: ds, isToday: ds === todayStr2, isHoliday: !!KR_HOLIDAYS_2026[ds], holidayName: KR_HOLIDAYS_2026[ds] || '', dow });
+      }
+      return days;
+    };
+
+    const buildWeeks = (m: number) => {
+      const allDays = getDaysInMonth(m); const allDaysMap: Record<string, typeof allDays[0]> = {};
+      allDays.forEach(d => { allDaysMap[d.dateStr] = d; });
+      const weeks: (typeof allDays[0] | null)[][] = [];
+      const firstDate = new Date(year, m - 1, 1); let startSun = new Date(firstDate);
+      const dow = firstDate.getDay(); startSun.setDate(startSun.getDate() - dow);
+      const lastDate = new Date(year, m, 0); let endSat = new Date(lastDate);
+      const ldow = lastDate.getDay(); if (ldow !== 6) endSat.setDate(endSat.getDate() + (6 - ldow));
+      const cur = new Date(startSun);
+      while (cur <= endSat) {
+        const week: (typeof allDays[0] | null)[] = [];
+        for (let wd = 0; wd < 7; wd++) { const ds = toDateStr(new Date(cur)); week.push(allDaysMap[ds] || null); cur.setDate(cur.getDate() + 1); }
+        weeks.push(week);
+      }
+      return weeks;
+    };
+
+    const weeks = buildWeeks(calMonth);
+
+    const buildTaskBars = () => {
+      const result: any[][] = weeks.map(() => []);
+      groupFiltered.forEach((proj: any) => {
+        proj.tasks.forEach((task: any) => {
+          if (!task.startDate || !task.endDate) return;
+          const sd = parseDate(task.startDate); const ed = parseDate(task.endDate);
+          weeks.forEach((week, wi) => {
+            const wdDays = week.slice(1, 6).filter(Boolean) as NonNullable<typeof week[0]>[];
+            if (!wdDays.length) return;
+            const weekStart = parseDate(wdDays[0].dateStr); const weekEnd = parseDate(wdDays[wdDays.length - 1].dateStr);
+            if (ed < weekStart || sd > weekEnd) return;
+            let colStart = 1, colEnd = 5;
+            for (let ci = 1; ci <= 5; ci++) { if (!week[ci]) continue; if (parseDate(week[ci]!.dateStr) >= sd) { colStart = ci; break; } colStart = ci + 1; }
+            for (let ci = 5; ci >= 1; ci--) { if (!week[ci]) continue; if (parseDate(week[ci]!.dateStr) <= ed) { colEnd = ci; break; } colEnd = ci - 1; }
+            if (colStart > colEnd) return;
+            const catColor = CATEGORY_COLORS[task.category] || CATEGORY_COLORS[proj.category];
+            const fallback = COLOR_MAP[proj.color] || COLOR_MAP.blue;
+            result[wi].push({ task, pid: proj.id, color: catColor ? catColor.border : fallback.bar, colorBg: catColor ? catColor.bg : fallback.barLight, colStart, colSpan: colEnd - colStart + 1, isStart: sd >= weekStart, isEnd: ed <= weekEnd });
+          });
+        });
+      });
+      result.forEach(bars => {
+        const laneEnds: number[] = []; bars.sort((a: any, b: any) => a.colStart - b.colStart);
+        bars.forEach((bar: any) => { const lane = laneEnds.findIndex(e => e < bar.colStart); bar.lane = lane === -1 ? laneEnds.length : lane; laneEnds[bar.lane] = bar.colStart + bar.colSpan - 1; });
+      });
+      return result;
+    };
+
+    const taskBars = React.useMemo(() => buildTaskBars(), [calMonth, filtered, selectedGroups]);
+    const LANE_H = 22; const LANE_GAP = 3; const CELL_TOP_PAD = 42; const MIN_LANES = 2;
+    const weekRowHeights = React.useMemo(() => taskBars.map(bars => { const lanes = bars.map((b: any) => b.lane); const laneCount = Math.max(lanes.length ? Math.max(...lanes) + 1 : 0, MIN_LANES); return CELL_TOP_PAD + laneCount * (LANE_H + LANE_GAP) + 8; }), [taskBars]);
+    const finalRowHeights = weekRowHeights;
+    const calScrollRef = React.useRef<HTMLDivElement>(null);
+    const colToLeftUnit = (ci: number) => SAT_SUN_RATIO + (ci - 1);
+
+    return (
+      <div style={{flex:1,display:'flex',flexDirection:'column',overflow:'hidden',minHeight:0}}>
+        <div style={{display:'flex',flexDirection:'column',background:'white',borderBottom:'1px solid #e5e7eb',flexShrink:0}}>
+          {isDesktop ? (
+            <div style={{display:'flex',alignItems:'center',padding:'6px 12px',gap:12,flexWrap:'nowrap',overflowX:'auto'}}>
+              <div style={{display:'flex',alignItems:'center',gap:8,flexShrink:0}}>
+                <button onClick={()=>setCalMonth((m: number)=>Math.max(1,m-1))} disabled={calMonth===1} style={{width:28,height:28,borderRadius:8,border:'1px solid #e5e7eb',background:calMonth===1?'#f9fafb':'white',cursor:calMonth===1?'default':'pointer',fontSize:16,display:'flex',alignItems:'center',justifyContent:'center',color:calMonth===1?'#d1d5db':'#374151'}}>‹</button>
+                <span style={{fontSize:16,fontWeight:800,color:'#1e293b',whiteSpace:'nowrap',minWidth:90,textAlign:'center'}}>2026년 {calMonth}월</span>
+                <button onClick={()=>setCalMonth((m: number)=>Math.min(12,m+1))} disabled={calMonth===12} style={{width:28,height:28,borderRadius:8,border:'1px solid #e5e7eb',background:calMonth===12?'#f9fafb':'white',cursor:calMonth===12?'default':'pointer',fontSize:16,display:'flex',alignItems:'center',justifyContent:'center',color:calMonth===12?'#d1d5db':'#374151'}}>›</button>
+              </div>
+              <div style={{width:1,height:20,background:'#e5e7eb',flexShrink:0}}/>
+              <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'nowrap'}}>
+                <span style={{fontSize:11,color:'#6b7280',fontWeight:700,flexShrink:0}}>업무유형:</span>
+                {CATEGORIES.map(cat => { const cc = CATEGORY_COLORS[cat]; return (<div key={cat} style={{display:'flex',alignItems:'center',gap:3,flexShrink:0}}><div style={{width:10,height:10,borderRadius:2,background:cc.border,flexShrink:0}}/><span style={{fontSize:11,color:'#4b5563',fontWeight:600}}>{cat}</span></div>); })}
+              </div>
+              {allGroups && allGroups.length > 0 && (
+                <div ref={groupDropRef} style={{position:'relative',marginLeft:'auto',flexShrink:0}}>
+                  <button onClick={()=>setGroupDropOpen(o=>!o)} style={{display:'flex',alignItems:'center',gap:4,padding:'4px 10px',borderRadius:8,border:`1px solid ${selectedGroups.length>0?'#6366f1':'#e5e7eb'}`,background:selectedGroups.length>0?'#eef2ff':'white',fontSize:12,fontWeight:selectedGroups.length>0?700:400,color:selectedGroups.length>0?'#4338ca':'#374151',cursor:'pointer',whiteSpace:'nowrap'}}>
+                    📁 {selectedGroups.length===0?'전체그룹':`${selectedGroups.length}개 선택`}<span style={{fontSize:10,opacity:0.6}}>{groupDropOpen?'▲':'▼'}</span>
+                  </button>
+                  {groupDropOpen && (
+                    <div style={{position:'absolute',top:'calc(100% + 4px)',right:0,background:'white',border:'1px solid #e5e7eb',borderRadius:10,boxShadow:'0 4px 16px rgba(0,0,0,0.12)',zIndex:100,minWidth:140,padding:'6px 0'}}>
+                      <div onClick={()=>{setSelectedGroups([]);setGroupDropOpen(false);}} style={{padding:'7px 14px',fontSize:13,cursor:'pointer',fontWeight:selectedGroups.length===0?700:400,color:selectedGroups.length===0?'#6366f1':'#374151',background:selectedGroups.length===0?'#f5f3ff':'white'}}>전체 보기</div>
+                      <div style={{height:1,background:'#f1f5f9',margin:'4px 0'}}/>
+                      {allGroups.map((g: string) => { const isSelected = selectedGroups.includes(g); return (<div key={g} onClick={()=>setSelectedGroups(prev=>prev.includes(g)?prev.filter(x=>x!==g):[...prev,g])} style={{display:'flex',alignItems:'center',gap:8,padding:'7px 14px',fontSize:13,cursor:'pointer',background:isSelected?'#f5f3ff':'white',color:isSelected?'#4338ca':'#374151',fontWeight:isSelected?600:400}}><div style={{width:14,height:14,borderRadius:3,border:`2px solid ${isSelected?'#6366f1':'#d1d5db'}`,background:isSelected?'#6366f1':'white',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>{isSelected && <span style={{color:'white',fontSize:10,lineHeight:1}}>✓</span>}</div>{g}</div>); })}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          ) : (
+            <>
+              <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'8px 12px',gap:8}}>
+                <div style={{display:'flex',alignItems:'center',gap:8,flexShrink:0}}>
+                  <button onClick={()=>setCalMonth((m: number)=>Math.max(1,m-1))} disabled={calMonth===1} style={{width:28,height:28,borderRadius:8,border:'1px solid #e5e7eb',background:calMonth===1?'#f9fafb':'white',cursor:calMonth===1?'default':'pointer',fontSize:16,display:'flex',alignItems:'center',justifyContent:'center',color:calMonth===1?'#d1d5db':'#374151'}}>‹</button>
+                  <span style={{fontSize:16,fontWeight:800,color:'#1e293b',whiteSpace:'nowrap',textAlign:'center'}}>2026년 {calMonth}월</span>
+                  <button onClick={()=>setCalMonth((m: number)=>Math.min(12,m+1))} disabled={calMonth===12} style={{width:28,height:28,borderRadius:8,border:'1px solid #e5e7eb',background:calMonth===12?'#f9fafb':'white',cursor:calMonth===12?'default':'pointer',fontSize:16,display:'flex',alignItems:'center',justifyContent:'center',color:calMonth===12?'#d1d5db':'#374151'}}>›</button>
+                  {allGroups && allGroups.length > 0 && (
+                    <div ref={groupDropRef} style={{position:'relative'}}>
+                      <button onClick={()=>setGroupDropOpen(o=>!o)} style={{display:'flex',alignItems:'center',gap:4,padding:'4px 10px',borderRadius:8,border:`1px solid ${selectedGroups.length>0?'#6366f1':'#e5e7eb'}`,background:selectedGroups.length>0?'#eef2ff':'white',fontSize:12,fontWeight:selectedGroups.length>0?700:400,color:selectedGroups.length>0?'#4338ca':'#374151',cursor:'pointer',whiteSpace:'nowrap'}}>
+                        📁 {selectedGroups.length===0?'전체그룹':`${selectedGroups.length}개 선택`}<span style={{fontSize:10,opacity:0.6}}>{groupDropOpen?'▲':'▼'}</span>
+                      </button>
+                      {groupDropOpen && (
+                        <div style={{position:'absolute',top:'calc(100% + 4px)',left:0,background:'white',border:'1px solid #e5e7eb',borderRadius:10,boxShadow:'0 4px 16px rgba(0,0,0,0.12)',zIndex:100,minWidth:140,padding:'6px 0'}}>
+                          <div onClick={()=>{setSelectedGroups([]);setGroupDropOpen(false);}} style={{padding:'7px 14px',fontSize:13,cursor:'pointer',fontWeight:selectedGroups.length===0?700:400,color:selectedGroups.length===0?'#6366f1':'#374151',background:selectedGroups.length===0?'#f5f3ff':'white'}}>전체 보기</div>
+                          <div style={{height:1,background:'#f1f5f9',margin:'4px 0'}}/>
+                          {allGroups.map((g: string) => { const isSelected = selectedGroups.includes(g); return (<div key={g} onClick={()=>setSelectedGroups(prev=>prev.includes(g)?prev.filter(x=>x!==g):[...prev,g])} style={{display:'flex',alignItems:'center',gap:8,padding:'7px 14px',fontSize:13,cursor:'pointer',background:isSelected?'#f5f3ff':'white',color:isSelected?'#4338ca':'#374151',fontWeight:isSelected?600:400}}><div style={{width:14,height:14,borderRadius:3,border:`2px solid ${isSelected?'#6366f1':'#d1d5db'}`,background:isSelected?'#6366f1':'white',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>{isSelected && <span style={{color:'white',fontSize:10,lineHeight:1}}>✓</span>}</div>{g}</div>); })}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div style={{display:'flex',alignItems:'center',gap:8,padding:'5px 12px 7px',flexWrap:'wrap'}}>
+                <span style={{fontSize:11,color:'#6b7280',fontWeight:700,flexShrink:0}}>업무유형:</span>
+                {CATEGORIES.map(cat => { const cc = CATEGORY_COLORS[cat]; return (<div key={cat} style={{display:'flex',alignItems:'center',gap:3,flexShrink:0}}><div style={{width:10,height:10,borderRadius:2,background:cc.border,flexShrink:0}}/><span style={{fontSize:11,color:'#4b5563',fontWeight:600}}>{cat}</span></div>); })}
+              </div>
+            </>
+          )}
+        </div>
+        <div style={{display:'grid',gridTemplateColumns:GRID_COLS,borderBottom:'2px solid #e2e8f0',background:'white',flexShrink:0}}>
+          {WEEKDAYS_ALL.map((wd, i) => { const isSun = i === 0, isSat = i === 6; return (<div key={i} style={{padding:'7px 0',textAlign:'center',fontSize:13,fontWeight:700,color:isSun?'#ef4444':isSat?'#2563eb':'#374151',borderRight:i<6?'1px solid #e5e7eb':'none',background:isSun?'#fff5f5':isSat?'#eff6ff':'white'}}>{wd}</div>); })}
+        </div>
+        <div ref={calScrollRef} style={{flex:1,overflowY:'auto',background:'#f8fafc',display:'flex',flexDirection:'column'}}>
+          <div style={{display:'flex',flexDirection:'column',flex:1}}>
+            {weeks.map((week, wi) => {
+              const ROW_H = finalRowHeights[wi] || CELL_TOP_PAD + MIN_LANES * (LANE_H + LANE_GAP) + 8;
+              return (
+                <div key={wi} style={{display:'grid',gridTemplateColumns:GRID_COLS,borderBottom:'1px solid #e5e7eb',background:'white',minHeight:ROW_H,position:'relative',flex:'1'}}>
+                  {week.map((day, di) => {
+                    const isSun = di === 0, isSat = di === 6, isWeekend = isSun || isSat;
+                    return (
+                      <div key={di} style={{borderRight:di<6?`1px solid ${isWeekend?'#e5e7eb':'#f1f5f9'}`:'none',height:'100%',background:day?.isHoliday?'rgba(254,242,242,0.7)':day?.isToday?'rgba(238,242,255,0.7)':isSun?'rgba(255,245,245,0.4)':isSat?'rgba(239,246,255,0.4)':'white',position:'relative',overflow:'hidden'}}>
+                        {day && (<div style={{position:'absolute',top:5,left:0,right:0,display:'flex',alignItems:'center',justifyContent:'center',fontSize:12,fontWeight:day.isToday?800:500,color:day.isToday?'#6366f1':day.isHoliday?'#ef4444':isSun?'#ef4444':isSat?'#2563eb':'#374151',lineHeight:1,height:18}}>
+                          {day.date.getDate()===1?<span style={{fontWeight:800,fontSize:12}}>{isWeekend?day.date.getDate():`${day.date.getMonth()+1}/${day.date.getDate()}`}</span>:day.date.getDate()}
+                        </div>)}
+                        {!isWeekend && day?.isHoliday && (<div style={{position:'absolute',top:24,left:2,right:2,fontSize:11,color:'#ef4444',fontWeight:700,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',lineHeight:1.2,zIndex:3,pointerEvents:'none'}}>{day.holidayName}</div>)}
+                        {day?.isToday && !isWeekend && (<div style={{position:'absolute',top:5,right:4,width:5,height:5,borderRadius:'50%',background:'#6366f1'}}/>)}
+                      </div>
+                    );
+                  })}
+                  {taskBars[wi].map((bar: any, bi: number) => {
+                    const topOffset = CELL_TOP_PAD + bar.lane * (LANE_H + LANE_GAP);
+                    const prog = bar.task.progress || 0;
+                    const catColor = CATEGORY_COLORS[bar.task.category];
+                    const barBg = catColor ? catColor.border : bar.color;
+                    const barBgLight = catColor ? catColor.bg : (bar.colorBg || '#bfdbfe');
+                    const leftUnits = colToLeftUnit(bar.colStart); const rightUnits = colToLeftUnit(bar.colStart + bar.colSpan - 1) + 1;
+                    const leftPct = (leftUnits / TOTAL_UNITS) * 100; const widthPct = ((rightUnits - leftUnits) / TOTAL_UNITS) * 100;
+                    return (
+                      <div key={bi} onClick={() => onEditTask(bar.task, bar.pid)}
+                        onMouseEnter={e => { if (localTooltipTimer.current) clearTimeout(localTooltipTimer.current); localTooltipTimer.current = setTimeout(() => { setLocalTooltip({ name: bar.task.name, startDate: bar.task.startDate, endDate: bar.task.endDate }); setLocalTooltipPos({ x: e.clientX, y: e.clientY }); }, 80); }}
+                        onMouseMove={e => setLocalTooltipPos({ x: e.clientX, y: e.clientY })}
+                        onMouseLeave={() => { if (localTooltipTimer.current) clearTimeout(localTooltipTimer.current); setLocalTooltip(null); }}
+                        style={{position:'absolute',left:`calc(${leftPct}% + ${bar.isStart?3:0}px)`,width:`calc(${widthPct}% - ${(bar.isStart?3:0)+(bar.isEnd?3:0)}px)`,top:topOffset,height:LANE_H,boxSizing:'border-box',background:barBgLight,borderRadius:`${bar.isStart?5:0}px ${bar.isEnd?5:0}px ${bar.isEnd?5:0}px ${bar.isStart?5:0}px`,border:`1px solid ${barBg}55`,cursor:'pointer',display:'flex',alignItems:'center',overflow:'hidden',zIndex:2,boxShadow:'0 1px 3px rgba(0,0,0,0.10)',flexShrink:0}}>
+                        <div style={{position:'absolute',left:0,top:0,width:`${prog}%`,height:'100%',background:barBg,borderRadius:'inherit',opacity:0.85,pointerEvents:'none'}}/>
+                        {bar.isStart ? (
+                          <span style={{position:'relative',zIndex:1,fontSize:11,fontWeight:700,color:prog>40?'white':'#1f2937',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',paddingLeft:8,paddingRight:4,textShadow:prog>40?'0 1px 2px rgba(0,0,0,0.3)':'none',lineHeight:1,maxWidth:'100%'}}>
+                            {bar.task.name}{prog > 0 && <span style={{marginLeft:4,fontWeight:600,opacity:0.85}}>{prog}%</span>}
+                          </span>
+                        ) : (
+                          <><div style={{position:'relative',zIndex:1,width:3,height:'60%',borderLeft:'2px dashed rgba(255,255,255,0.7)',marginLeft:4,flexShrink:0}}/><span style={{position:'relative',zIndex:1,fontSize:11,fontWeight:600,color:prog>40?'rgba(255,255,255,0.85)':'rgba(31,41,55,0.7)',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',paddingLeft:6,paddingRight:4,lineHeight:1,maxWidth:'100%',fontStyle:'italic'}}>{bar.task.name}</span></>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+        {localTooltip && (
+          <div style={{position:'fixed',left:localTooltipPos.x+14,top:localTooltipPos.y-8,background:'#111827',color:'white',fontSize:13,padding:'10px 14px',borderRadius:8,whiteSpace:'nowrap',pointerEvents:'none',zIndex:99999,boxShadow:'0 4px 16px rgba(0,0,0,0.45)',lineHeight:1.7,border:'1px solid rgba(255,255,255,0.08)'}}>
+            {localTooltip.name && <div style={{fontWeight:700,marginBottom:4,color:'#f1f5f9',fontSize:14}}>{localTooltip.name}</div>}
+            <div style={{display:'flex',alignItems:'center',gap:6}}><span style={{color:'#6ee7b7',fontWeight:600,fontSize:13}}>▶</span><span style={{color:'#ffffff',fontWeight:600}}>{localTooltip.startDate}</span><span style={{color:'#9ca3af',fontSize:12,margin:'0 2px'}}>→</span><span style={{color:'#ffffff',fontWeight:600}}>{localTooltip.endDate}</span></div>
+            {localTooltip.startDate && KR_HOLIDAYS_2026[localTooltip.startDate] && (<div style={{fontSize:11,color:'#fca5a5',marginTop:3}}>🗓️ {KR_HOLIDAYS_2026[localTooltip.startDate]}</div>)}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  // ★ Undo/Redo 버튼 그룹 컴포넌트
+  const UndoRedoButtons = ({ size = 'md' }: { size?: 'sm' | 'md' }) => (
+    <div style={{display:'flex',alignItems:'center',gap:2,background:'rgba(255,255,255,0.07)',borderRadius:size==='sm'?7:8,padding:size==='sm'?2:3,border:'1px solid rgba(255,255,255,0.12)'}}>
+      <button
+        onClick={undo}
+        disabled={undoStack.length === 0}
+        title={`실행 취소 (Ctrl+Z)${undoStack.length > 0 ? ` · ${undoStack.length}단계` : ''}`}
+        style={undoBtnStyle(undoStack.length > 0, size) as React.CSSProperties}
+      >↩</button>
+      <button
+        onClick={redo}
+        disabled={redoStack.length === 0}
+        title={`다시 실행 (Ctrl+Y)${redoStack.length > 0 ? ` · ${redoStack.length}단계` : ''}`}
+        style={undoBtnStyle(redoStack.length > 0, size) as React.CSSProperties}
+      >↪</button>
+    </div>
+  );
+
   if (!showGantt) {
     const getMiniPos = (s: string, e: string) => {
       if (!s || !e) return null;
@@ -1079,84 +1304,44 @@ function GanttChart({ user, appId, onAppChange, onLogout }: { user: any; appId: 
       const right = Math.max(0, Math.min(100, (ed.getTime() - V_START.getTime()) / total * 100));
       return { left, width: Math.max(2, right - left) };
     };
-    const todayPct = (() => {
-      const t = new Date();
-      if (t < V_START || t > V_END) return null;
-      return (t.getTime() - V_START.getTime()) / (V_END.getTime() - V_START.getTime()) * 100;
-    })();
-
+    const todayPct = (() => { const t = new Date(); if (t < V_START || t > V_END) return null; return (t.getTime() - V_START.getTime()) / (V_END.getTime() - V_START.getTime()) * 100; })();
     const isTabletPortrait = deviceType === 'tablet' && isPortrait;
 
     return (
-      <div style={{height:'100dvh',width:'100%',maxWidth:'100vw',display:'flex',flexDirection:'column',background:'#0f0f1a',fontFamily:"'Pretendard',-apple-system,BlinkMacSystemFont,sans-serif",overflow:'hidden',boxSizing:'border-box',
-        paddingTop:'env(safe-area-inset-top)',
-        paddingBottom:'env(safe-area-inset-bottom)',
-        paddingLeft:'env(safe-area-inset-left)',
-        paddingRight:'env(safe-area-inset-right)',
-      }}>
+      <div style={{height:'100dvh',width:'100%',maxWidth:'100vw',display:'flex',flexDirection:'column',background:'#0f0f1a',fontFamily:"'Pretendard',-apple-system,BlinkMacSystemFont,sans-serif",overflow:'hidden',boxSizing:'border-box',paddingTop:'env(safe-area-inset-top)',paddingBottom:'env(safe-area-inset-bottom)',paddingLeft:'env(safe-area-inset-left)',paddingRight:'env(safe-area-inset-right)'}}>
+        <style>{`@import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css'); @keyframes spin{to{transform:rotate(360deg)}} @keyframes fadeInDown{from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:translateY(0)}} *, *::before, *::after{box-sizing:border-box;font-family:'Pretendard',-apple-system,BlinkMacSystemFont,sans-serif;color-scheme:light;} html,body{overflow-x:hidden;max-width:100vw;color-scheme:light;} .ms::-webkit-scrollbar{display:none} .ms{scrollbar-width:none} .ghdr:active{opacity:0.75} .btask:active{opacity:0.7} .hdr-collapsible{overflow:hidden;transition:max-height 0.3s cubic-bezier(0.4,0,0.2,1),opacity 0.25s ease;}`}</style>
 
-        <style>{`
-          @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
-          @keyframes spin{to{transform:rotate(360deg)}}
-          @keyframes fadeInDown{from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:translateY(0)}}
-          *, *::before, *::after { box-sizing: border-box; font-family:'Pretendard',-apple-system,BlinkMacSystemFont,sans-serif; }
-          html, body { overflow-x: hidden; max-width: 100vw; }
-          .ms::-webkit-scrollbar{display:none} .ms{scrollbar-width:none}
-          .ghdr:active{opacity:0.75} .btask:active{opacity:0.7}
-          .hdr-collapsible{ overflow:hidden; transition:max-height 0.3s cubic-bezier(0.4,0,0.2,1), opacity 0.25s ease; }
-        `}</style>
-
-        {/* 헤더 */}
-        <div style={{
-          background:'linear-gradient(135deg,#0f0f1a,#1a1a2e,#16213e)',
-          borderBottom:'1px solid rgba(255,255,255,0.08)',
-          flexShrink:0,
-          boxShadow:'0 2px 16px rgba(0,0,0,0.4)',
-          paddingTop: (!isPortrait && headerCollapsed) ? 6 : 10,
-          paddingBottom: (!isPortrait && headerCollapsed) ? 6 : 10,
-          paddingLeft: 'max(14px, env(safe-area-inset-left))',
-          paddingRight: 'max(14px, env(safe-area-inset-right))',
-          transition:'padding 0.28s ease',
-        }}>
-          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:(!isPortrait&&headerCollapsed)?0:8,transition:'margin-bottom 0.28s ease'}}>
-            <div style={{display:'flex',alignItems:'center',gap:8}}>
+        <div style={{background:'linear-gradient(135deg,#0f0f1a,#1a1a2e,#16213e)',borderBottom:'1px solid rgba(255,255,255,0.08)',flexShrink:0,boxShadow:'0 2px 16px rgba(0,0,0,0.4)',paddingTop:(!isPortrait&&headerCollapsed)?6:10,paddingBottom:(!isPortrait&&headerCollapsed)?6:10,paddingLeft:'max(14px, env(safe-area-inset-left))',paddingRight:'max(14px, env(safe-area-inset-right))',transition:'padding 0.28s ease'}}>
+          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:(!isPortrait&&headerCollapsed)?0:8,transition:'margin-bottom 0.28s ease',gap:4}}>
+            <div style={{display:'flex',alignItems:'center',flexShrink:0}}>
               <div style={{display:'flex',background:'rgba(255,255,255,0.07)',borderRadius:9,padding:3,border:'1px solid rgba(255,255,255,0.1)',gap:2}}>
                 {([2,1] as const).map(id=>(
-                  <button key={id} onClick={()=>onAppChange(id)}
-                    style={{padding:'5px 12px',borderRadius:7,border:'none',cursor:'pointer',fontSize:12,fontWeight:appId===id?700:400,
-                      background:appId===id?'linear-gradient(135deg,#6366f1,#8b5cf6)':'transparent',
-                      color:appId===id?'#fff':'rgba(148,163,184,0.7)',fontFamily:'inherit',
-                      boxShadow:appId===id?'0 2px 8px rgba(99,102,241,0.4)':'none',transition:'all 0.2s'}}>
+                  <button key={id} onClick={()=>onAppChange(id)} style={{padding:`5px ${screenW<320?'8px':'12px'}`,borderRadius:7,border:'none',cursor:'pointer',fontSize:screenW<320?11:12,fontWeight:appId===id?700:400,background:appId===id?'linear-gradient(135deg,#6366f1,#8b5cf6)':'transparent',color:appId===id?'#fff':'rgba(148,163,184,0.7)',fontFamily:'inherit',boxShadow:appId===id?'0 2px 8px rgba(99,102,241,0.4)':'none',transition:'all 0.2s',whiteSpace:'nowrap'}}>
                     {id===2?'샌디앱':'버스'}
                   </button>
                 ))}
               </div>
             </div>
-            <div style={{display:'flex',alignItems:'center',gap:6}}>
+            <div style={{display:'flex',alignItems:'center',gap:deviceType==='fold'?2:screenW<320?3:6,flexShrink:0}}>
               {saving && <div style={{display:'flex',alignItems:'center',gap:4,fontSize:10,color:'#4ade80'}}><div style={{width:8,height:8,border:'2px solid #4ade80',borderTopColor:'transparent',borderRadius:'50%',animation:'spin 0.8s linear infinite'}}/>저장중</div>}
-              {realtimeToast && <span style={{fontSize:10,color:'#4ade80',background:'rgba(74,222,128,0.12)',padding:'2px 7px',borderRadius:8,border:'1px solid rgba(74,222,128,0.25)',fontWeight:600,animation:'fadeInDown 0.3s ease'}}>🔄 업데이트</span>}
-              {/* 월보기 토글 버튼 */}
-              <button onClick={()=>setViewMode(viewMode==='month'?'year':'month')}
-                style={{padding:'5px 10px',background:viewMode==='month'?'rgba(99,102,241,0.9)':'rgba(255,255,255,0.07)',border:`1px solid ${viewMode==='month'?'rgba(99,102,241,0.7)':'rgba(255,255,255,0.15)'}`,borderRadius:7,cursor:'pointer',fontSize:11,color:viewMode==='month'?'white':'#a5b4fc',fontFamily:'inherit',fontWeight:700}}>
+              {realtimeToast && <span style={{fontSize:10,color:'#4ade80',fontWeight:600,animation:'fadeInDown 0.3s ease'}}>🔄</span>}
+              <button onClick={()=>setViewMode(viewMode==='month'?'year':'month')} style={{padding:`5px ${deviceType==='fold'?'6px':screenW<320?'7px':'10px'}`,background:viewMode==='month'?'rgba(99,102,241,0.9)':'rgba(255,255,255,0.07)',border:`1px solid ${viewMode==='month'?'rgba(99,102,241,0.7)':'rgba(255,255,255,0.15)'}`,borderRadius:7,cursor:'pointer',fontSize:10,color:viewMode==='month'?'white':'#a5b4fc',fontFamily:'inherit',fontWeight:700,whiteSpace:'nowrap'}}>
                 {viewMode==='month'?'📋 목록':'📅 월'}
               </button>
               {viewMode!=='month' && <>
-                <button onClick={expandAll} style={{padding:'5px 9px',background:'rgba(99,102,241,0.2)',border:'1px solid rgba(99,102,241,0.5)',borderRadius:7,cursor:'pointer',fontSize:11,color:'#c7d2fe',fontFamily:'inherit',fontWeight:700}}>전체펴기</button>
-                <button onClick={collapseAll} style={{padding:'5px 9px',background:'rgba(99,102,241,0.2)',border:'1px solid rgba(99,102,241,0.5)',borderRadius:7,cursor:'pointer',fontSize:11,color:'#c7d2fe',fontFamily:'inherit',fontWeight:700}}>전체접기</button>
+                <button onClick={expandAll} style={{padding:`5px ${screenW<320?'6px':'9px'}`,background:'rgba(99,102,241,0.2)',border:'1px solid rgba(99,102,241,0.5)',borderRadius:7,cursor:'pointer',fontSize:screenW<320?10:11,color:'#c7d2fe',fontFamily:'inherit',fontWeight:700,whiteSpace:'nowrap'}}>{screenW<320?'펴기':'전체펴기'}</button>
+                <button onClick={collapseAll} style={{padding:`5px ${screenW<320?'6px':'9px'}`,background:'rgba(99,102,241,0.2)',border:'1px solid rgba(99,102,241,0.5)',borderRadius:7,cursor:'pointer',fontSize:screenW<320?10:11,color:'#c7d2fe',fontFamily:'inherit',fontWeight:700,whiteSpace:'nowrap'}}>{screenW<320?'접기':'전체접기'}</button>
               </>}
-              <button onClick={onLogout} style={{padding:'5px 10px',background:'rgba(239,68,68,0.15)',border:'1px solid rgba(239,68,68,0.25)',borderRadius:7,cursor:'pointer',fontSize:11,color:'#fca5a5',fontFamily:'inherit'}}>로그아웃</button>
+              <button onClick={onLogout} style={{padding:`5px ${deviceType==='fold'?'6px':screenW<320?'7px':'10px'}`,background:'rgba(239,68,68,0.15)',border:'1px solid rgba(239,68,68,0.25)',borderRadius:7,cursor:'pointer',fontSize:10,color:'#fca5a5',fontFamily:'inherit',whiteSpace:'nowrap'}}>{deviceType==='fold'?'⏻':'로그아웃'}</button>
             </div>
           </div>
-
           <div className="hdr-collapsible" style={{maxHeight:(!isPortrait&&headerCollapsed)?'0px':'50px',opacity:(!isPortrait&&headerCollapsed)?0:1}}>
             <div className="ms" style={{display:'flex',gap:5,overflowX:'auto',paddingBottom:2,alignItems:'center'}}>
-              <button onClick={()=>setActiveCategories([])}
-                style={{padding:'4px 12px',borderRadius:20,fontSize:11,cursor:'pointer',fontWeight:activeCategories.length===0?600:400,border:activeCategories.length===0?'1.5px solid #818cf8':'1.5px solid rgba(255,255,255,0.2)',background:activeCategories.length===0?'rgba(99,102,241,0.35)':'rgba(255,255,255,0.07)',color:activeCategories.length===0?'#fff':'#e2e8f0',whiteSpace:'nowrap',flexShrink:0,fontFamily:'inherit'}}>
-                전체 {projects.length}
+              <button onClick={()=>setActiveCategories([])} style={{padding:'4px 12px',borderRadius:20,fontSize:11,cursor:'pointer',fontWeight:activeCategories.length===0?600:400,border:activeCategories.length===0?'1.5px solid #818cf8':'1.5px solid rgba(255,255,255,0.2)',background:activeCategories.length===0?'rgba(99,102,241,0.35)':'rgba(255,255,255,0.07)',color:activeCategories.length===0?'#fff':'#e2e8f0',whiteSpace:'nowrap',flexShrink:0,fontFamily:'inherit'}}>
+                전체 {projects.filter((p:any)=>p.category!=='영업').reduce((s:any,p:any)=>s+p.tasks.length,0)}
               </button>
               {CATEGORIES.map(cat=>{ const isActive=activeCategories.includes(cat); const cc=CATEGORY_COLORS[cat]; return (
-                <button key={cat} onClick={()=>setActiveCategories(prev=>prev.includes(cat)?prev.filter(c=>c!==cat):[...prev,cat])}
-                  style={{padding:'4px 12px',borderRadius:20,fontSize:11,cursor:'pointer',fontWeight:isActive?600:400,border:isActive?`1.5px solid ${cc.border}`:'1.5px solid rgba(255,255,255,0.2)',background:isActive?`${cc.bg}22`:'rgba(255,255,255,0.07)',color:isActive?cc.border:'#e2e8f0',whiteSpace:'nowrap',flexShrink:0,fontFamily:'inherit',display:'flex',alignItems:'center',gap:4}}>
+                <button key={cat} onClick={()=>setActiveCategories(prev=>prev.includes(cat)?prev.filter(c=>c!==cat):[...prev,cat])} style={{padding:'4px 12px',borderRadius:20,fontSize:11,cursor:'pointer',fontWeight:isActive?600:400,border:isActive?`1.5px solid ${cc.border}`:'1.5px solid rgba(255,255,255,0.2)',background:isActive?`${cc.bg}22`:'rgba(255,255,255,0.07)',color:isActive?cc.border:'#e2e8f0',whiteSpace:'nowrap',flexShrink:0,fontFamily:'inherit',display:'flex',alignItems:'center',gap:4}}>
                   <span style={{width:7,height:7,borderRadius:'50%',background:cc.border,flexShrink:0,display:'inline-block'}}/>
                   {cat}
                 </button>
@@ -1166,42 +1351,24 @@ function GanttChart({ user, appId, onAppChange, onLogout }: { user: any; appId: 
           </div>
         </div>
 
-        {/* 월보기 */}
-        {viewMode === 'month' && <MonthCalendarView
-          calMonth={calMonth}
-          setCalMonth={setCalMonth}
-          filtered={filtered.filter((p: any) => p.category !== '영업')}
-          todayStr2={todayStr()}
-          onEditTask={(task: any, pid: number) => setEditingTask({ task, pid })}
-        />}
+        {viewMode === 'month' && <MonthCalendarView calMonth={calMonth} setCalMonth={setCalMonth} filtered={filtered} todayStr2={todayStr()} onEditTask={(task: any, pid: number) => setEditingTask({ task, pid })} allGroups={allGroups} isDesktop={false} />}
 
-        {/* 카드뷰 스크롤 영역 */}
-        {viewMode !== 'month' && <div ref={mobileScrollRef} className="ms" style={{
-          flex:1, overflowY:'auto', overflowX:'hidden',
-          paddingTop: 10,
-          paddingBottom: 90,
-          paddingLeft: isTabletPortrait ? 'max(20px, env(safe-area-inset-left))' : 'max(12px, env(safe-area-inset-left))',
-          paddingRight: isTabletPortrait ? 'max(20px, env(safe-area-inset-right))' : 'max(12px, env(safe-area-inset-right))',
-        }}>
+        {viewMode !== 'month' && <div ref={mobileScrollRef} className="ms" style={{flex:1,overflowY:'auto',overflowX:'hidden',paddingTop:10,paddingBottom:90,paddingLeft:isTabletPortrait?'max(20px, env(safe-area-inset-left))':'max(12px, env(safe-area-inset-left))',paddingRight:isTabletPortrait?'max(20px, env(safe-area-inset-right))':'max(12px, env(safe-area-inset-right))'}}>
           {groupedFiltered.length===0 ? (
             <div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'80px 0',color:'#475569',gap:10}}>
-              <span style={{fontSize:32}}>📋</span>
-              <span style={{fontSize:14}}>프로젝트가 없습니다</span>
+              <span style={{fontSize:32}}>📋</span><span style={{fontSize:14}}>프로젝트가 없습니다</span>
               <button onClick={addProject} style={{color:'#6366f1',background:'none',border:'1px solid rgba(99,102,241,0.3)',borderRadius:20,padding:'6px 16px',cursor:'pointer',fontSize:13,fontFamily:'inherit'}}>+ 프로젝트 추가</button>
             </div>
           ) : groupedFiltered.map(group=>(
             <div key={group.name} style={{marginBottom:14}}>
-              <div className="ghdr" onClick={()=>toggleGroup(group.name)}
-                style={{display:'flex',alignItems:'center',gap:7,padding:'7px 10px',background:'rgba(99,102,241,0.1)',borderRadius:10,marginBottom:8,borderLeft:'3px solid #6366f1',cursor:'pointer',userSelect:'none'}}>
+              <div className="ghdr" onClick={()=>toggleGroup(group.name)} style={{display:'flex',alignItems:'center',gap:7,padding:'7px 10px',background:'rgba(99,102,241,0.1)',borderRadius:10,marginBottom:8,borderLeft:'3px solid #6366f1',cursor:'pointer',userSelect:'none'}}>
                 <span style={{fontSize:13}}>📁</span>
                 <span style={{fontSize:13,fontWeight:800,color:'#e2e8f0',flex:1}}>{group.name}</span>
                 <span style={{fontSize:11,color:'#6366f1',background:'rgba(99,102,241,0.15)',padding:'1px 7px',borderRadius:10,fontWeight:600}}>{group.items.length}개</span>
                 <span style={{fontSize:11,color:'#6366f1',transition:'transform 0.2s',display:'inline-block',transform:collapsedGroups.has(group.name)?'rotate(0deg)':'rotate(90deg)'}}>▶</span>
               </div>
-
               {!collapsedGroups.has(group.name) && group.items.map((proj:any)=>{
-                const c=COLOR_MAP[proj.color]||COLOR_MAP.blue;
-                const catColor=CATEGORY_COLORS[proj.category];
+                const c=COLOR_MAP[proj.color]||COLOR_MAP.blue; const catColor=CATEGORY_COLORS[proj.category];
                 const {progress:projProg,startDate:projStart,endDate:projEnd}=getProjectMeta(proj);
                 const projMiniPos=getMiniPos(projStart,projEnd);
                 return (
@@ -1218,12 +1385,7 @@ function GanttChart({ user, appId, onAppChange, onLogout }: { user: any; appId: 
                           <button onClick={()=>deleteProject(proj.id)} style={{padding:4,background:'none',border:'none',cursor:'pointer',fontSize:14,lineHeight:1}}>🗑️</button>
                         </div>
                       </div>
-                      {(proj.owner||proj.subOwner||projStart) && (
-                        <div style={{fontSize:11,color:'#94a3b8',marginBottom:6,display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
-                          {(proj.owner||proj.subOwner) && <span>👤 {[proj.owner,proj.subOwner].filter(Boolean).join(' · ')}</span>}
-                          {projStart && <span>📅 {projStart} → {projEnd}</span>}
-                        </div>
-                      )}
+                      {(proj.owner||proj.subOwner||projStart) && (<div style={{fontSize:11,color:'#94a3b8',marginBottom:6,display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>{(proj.owner||proj.subOwner)&&<span>👤 {[proj.owner,proj.subOwner].filter(Boolean).join(' · ')}</span>}{projStart&&<span>📅 {projStart} → {projEnd}</span>}</div>)}
                       {projMiniPos && (
                         <div style={{position:'relative',marginBottom:2}}>
                           <div style={{height:5,background:'rgba(255,255,255,0.05)',borderRadius:3,position:'relative',overflow:'visible'}}>
@@ -1231,438 +1393,67 @@ function GanttChart({ user, appId, onAppChange, onLogout }: { user: any; appId: 
                             <div style={{position:'absolute',top:0,left:`${projMiniPos.left}%`,width:`${projMiniPos.width*(projProg/100)}%`,height:'100%',background:catColor?catColor.border:c.bar,borderRadius:3,opacity:0.9}}/>
                             {todayPct!==null&&<div style={{position:'absolute',left:`${todayPct}%`,top:-3,width:2,height:11,background:'#ef4444',borderRadius:1,zIndex:2}}/>}
                           </div>
-                          <div style={{display:'flex',justifyContent:'space-between',marginTop:3,fontSize:9,color:'#475569'}}>
-                            <span>1월</span><span>4월</span><span>7월</span><span>10월</span><span>12월</span>
-                          </div>
+                          <div style={{display:'flex',justifyContent:'space-between',marginTop:3,fontSize:9,color:'#475569'}}><span>1월</span><span>4월</span><span>7월</span><span>10월</span><span>12월</span></div>
                         </div>
                       )}
                       {proj.description&&<div style={{fontSize:12,color:'#64748b',marginTop:4,lineHeight:1.4}}>{proj.description}</div>}
                     </div>
-
                     {proj.expanded && proj.tasks.length>0 && (
                       <div style={{borderTop:'1px solid rgba(255,255,255,0.05)',padding:'6px 12px 6px'}}>
-                        {proj.tasks.map((task:any)=>{
-                          const tc=CATEGORY_COLORS[task.category];
-                          const tp=getMiniPos(task.startDate,task.endDate);
-                          return (
-                            <div key={task.id} style={{padding:'6px 8px',borderRadius:8,marginBottom:4,background:'rgba(255,255,255,0.02)',border:'1px solid rgba(255,255,255,0.04)'}}>
-                              <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:6,marginBottom:tp?3:0}}>
-                                <div style={{display:'flex',alignItems:'center',gap:5,flex:1,minWidth:0}}>
-                                  <span style={{color:'rgba(167,139,250,0.5)',fontSize:11,flexShrink:0}}>└</span>
-                                  {task.category&&tc&&<span style={{fontSize:10,fontWeight:700,padding:'1px 5px',borderRadius:6,background:tc.bg,color:tc.text,border:`1px solid ${tc.border}`,flexShrink:0}}>{task.category}</span>}
-                                  <span style={{fontSize:12,color:'#e2e8f0',fontWeight:500,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{task.name}</span>
-                                </div>
-                                <div style={{display:'flex',alignItems:'center',gap:3,flexShrink:0}}>
-                                  <span style={{fontSize:10,color:'#475569',whiteSpace:'nowrap'}}>{task.startDate?.slice(5)} → {task.endDate?.slice(5)}</span>
-                                  <button onClick={()=>setEditingTask({task,pid:proj.id})} style={{padding:2,background:'none',border:'none',cursor:'pointer',fontSize:12,lineHeight:1}}>✏️</button>
-                                  <button onClick={()=>deleteTask(proj.id,task.id)} style={{padding:2,background:'none',border:'none',cursor:'pointer',fontSize:12,lineHeight:1}}>🗑️</button>
-                                </div>
+                        {proj.tasks.map((task:any)=>{ const tc=CATEGORY_COLORS[task.category]; const tp=getMiniPos(task.startDate,task.endDate); return (
+                          <div key={task.id} style={{padding:'6px 8px',borderRadius:8,marginBottom:4,background:'rgba(255,255,255,0.02)',border:'1px solid rgba(255,255,255,0.04)'}}>
+                            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:6,marginBottom:tp?3:0}}>
+                              <div style={{display:'flex',alignItems:'center',gap:5,flex:1,minWidth:0}}>
+                                <span style={{color:'rgba(167,139,250,0.5)',fontSize:11,flexShrink:0}}>└</span>
+                                {task.category&&tc&&<span style={{fontSize:10,fontWeight:700,padding:'1px 5px',borderRadius:6,background:tc.bg,color:tc.text,border:`1px solid ${tc.border}`,flexShrink:0}}>{task.category}</span>}
+                                <span style={{fontSize:12,color:'#e2e8f0',fontWeight:500,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{task.name}</span>
                               </div>
-                              {tp&&(<div style={{height:3,background:'rgba(255,255,255,0.04)',borderRadius:2,position:'relative',overflow:'hidden'}}>
-                                <div style={{position:'absolute',top:0,left:`${tp.left}%`,width:`${tp.width}%`,height:'100%',background:tc?tc.bg:'rgba(255,255,255,0.08)'}}/>
-                                <div style={{position:'absolute',top:0,left:`${tp.left}%`,width:`${tp.width*(task.progress||0)/100}%`,height:'100%',background:tc?tc.border:c.bar,opacity:0.85}}/>
-                              </div>)}
+                              <div style={{display:'flex',alignItems:'center',gap:3,flexShrink:0}}>
+                                <span style={{fontSize:10,color:'#475569',whiteSpace:'nowrap'}}>{task.startDate?.slice(5)} → {task.endDate?.slice(5)}</span>
+                                <button onClick={()=>setEditingTask({task,pid:proj.id})} style={{padding:2,background:'none',border:'none',cursor:'pointer',fontSize:12,lineHeight:1}}>✏️</button>
+                                <button onClick={()=>deleteTask(proj.id,task.id)} style={{padding:2,background:'none',border:'none',cursor:'pointer',fontSize:12,lineHeight:1}}>🗑️</button>
+                              </div>
                             </div>
-                          );
-                        })}
+                            {tp&&(<div style={{height:3,background:'rgba(255,255,255,0.04)',borderRadius:2,position:'relative',overflow:'hidden'}}><div style={{position:'absolute',top:0,left:`${tp.left}%`,width:`${tp.width}%`,height:'100%',background:tc?tc.bg:'rgba(255,255,255,0.08)'}}/><div style={{position:'absolute',top:0,left:`${tp.left}%`,width:`${tp.width*(task.progress||0)/100}%`,height:'100%',background:tc?tc.border:c.bar,opacity:0.85}}/></div>)}
+                          </div>
+                        ); })}
                       </div>
                     )}
-                    {!proj.expanded && proj.tasks.length>0 && (
-                      <div style={{padding:'2px 12px 0',borderTop:'1px solid rgba(255,255,255,0.04)'}} />
-                    )}
+                    {!proj.expanded && proj.tasks.length>0 && (<div style={{padding:'2px 12px 0',borderTop:'1px solid rgba(255,255,255,0.04)'}} />)}
                     <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'6px 12px 9px',borderTop:'1px solid rgba(255,255,255,0.05)'}}>
-                      <button onClick={()=>toggleProject(proj.id)} style={{fontSize:11,color:'#6366f1',background:'none',border:'none',cursor:'pointer',fontFamily:'inherit',display:'flex',alignItems:'center',gap:3}}>
-                        {proj.expanded ? '▲ 접기' : `▼ 펼치기${proj.tasks.length>0?` (Task ${proj.tasks.length}개)`:''}`}
-                      </button>
-                      <button className="btask" onClick={()=>{if(!proj.expanded)toggleProject(proj.id);addTask(proj.id);}}
-                        style={{display:'flex',alignItems:'center',gap:5,padding:'5px 14px',background:'rgba(99,102,241,0.1)',border:'1px solid rgba(99,102,241,0.4)',borderRadius:20,fontSize:12,fontWeight:600,color:'#818cf8',cursor:'pointer',fontFamily:'inherit',whiteSpace:'nowrap'}}>
-                        ＋ Task 추가
-                      </button>
+                      <button onClick={()=>toggleProject(proj.id)} style={{fontSize:11,color:'#6366f1',background:'none',border:'none',cursor:'pointer',fontFamily:'inherit',display:'flex',alignItems:'center',gap:3}}>{proj.expanded?'▲ 접기':`▼ 펼치기${proj.tasks.length>0?` (Task ${proj.tasks.length}개)`:''}`}</button>
+                      <button className="btask" onClick={()=>{if(!proj.expanded)toggleProject(proj.id);addTask(proj.id);}} style={{display:'flex',alignItems:'center',gap:5,padding:'5px 14px',background:'rgba(99,102,241,0.1)',border:'1px solid rgba(99,102,241,0.4)',borderRadius:20,fontSize:12,fontWeight:600,color:'#818cf8',cursor:'pointer',fontFamily:'inherit',whiteSpace:'nowrap'}}>＋ Task 추가</button>
                     </div>
                   </div>
                 );
               })}
             </div>
           ))}
-        </div>}  {/* viewMode !== 'month' 카드뷰 끝 */}
+        </div>}
 
-        {/* FAB — 월보기 아닐 때만 */}
-        {viewMode !== 'month' && <button onClick={addProject} style={{
-          position:'fixed',
-          bottom:'max(24px, calc(env(safe-area-inset-bottom) + 16px))',
-          right:'max(18px, env(safe-area-inset-right))',
-          width:52,height:52,
-          background:'linear-gradient(135deg,#6366f1,#8b5cf6)',border:'none',borderRadius:'50%',
-          display:'flex',alignItems:'center',justifyContent:'center',
-          fontSize:26,color:'white',cursor:'pointer',
-          boxShadow:'0 4px 20px rgba(99,102,241,0.55)',zIndex:30,
-        }}>+</button>}
+        {viewMode !== 'month' && <button onClick={addProject} style={{position:'fixed',bottom:'max(24px, calc(env(safe-area-inset-bottom) + 16px))',right:'max(18px, env(safe-area-inset-right))',width:52,height:52,background:'linear-gradient(135deg,#6366f1,#8b5cf6)',border:'none',borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center',fontSize:26,color:'white',cursor:'pointer',boxShadow:'0 4px 20px rgba(99,102,241,0.55)',zIndex:30}}>+</button>}
 
-        {editingProject && <ProjectEditModal proj={editingProject} onClose={()=>setEditingProject(null)} />}
-        {editingTask && <TaskEditModal task={editingTask.task} pid={editingTask.pid} onClose={()=>setEditingTask(null)} />}
+        {editingProject && <ProjectEditModal proj={editingProject} onClose={()=>setEditingProject(null)} allGroups={allGroups} updateProject={updateProject} />}
+        {editingTask && <TaskEditModal task={editingTask.task} pid={editingTask.pid} onClose={()=>setEditingTask(null)} updateTask={updateTask} />}
         {showChangePw && <ChangePwModal />}
       </div>
     );
   }
 
-  // ────────────────────────────────────────────────────────────
-  // 데스크탑 / 태블릿 가로 → 간트차트 뷰
-  // ────────────────────────────────────────────────────────────
+  // ── 데스크탑 / 태블릿 가로 간트차트 뷰 ──────────────────────
 
-  // ── 월 캘린더 뷰 컴포넌트 ────────────────────────────────────
-  const MonthCalendarView = ({ calMonth, setCalMonth, filtered, todayStr2, onEditTask }: any) => {
-    // ── 로컬 tooltip (부모 리렌더 차단) ─────────────────────────
-    const [localTooltip, setLocalTooltip] = React.useState<any>(null);
-    const [localTooltipPos, setLocalTooltipPos] = React.useState({ x:0, y:0 });
-    const localTooltipTimer = React.useRef<ReturnType<typeof setTimeout>|null>(null);
-
-    // 일 월 화 수 목 금 토 순서
-    const WEEKDAYS_ALL = ['일','월','화','수','목','금','토'];
-    const year = 2026;
-    // 일 0.3fr, 월~금 1fr, 토 0.3fr
-    const GRID_COLS = '0.3fr 1fr 1fr 1fr 1fr 1fr 0.3fr';
-    const SAT_SUN_RATIO = 0.3;
-    // 전체 유닛: 일(0.3) + 월~금(5) + 토(0.3) = 5.6
-    const TOTAL_UNITS = SAT_SUN_RATIO + 5 + SAT_SUN_RATIO;
-
-    const getDaysInMonth = (m: number) => {
-      const days: { date: Date; dateStr: string; isToday: boolean; isHoliday: boolean; holidayName: string; dow: number }[] = [];
-      const firstDay = new Date(year, m - 1, 1);
-      const lastDay  = new Date(year, m, 0);
-      for (let d = new Date(firstDay); d <= lastDay; d.setDate(d.getDate() + 1)) {
-        const dow = d.getDay();
-        const ds = toDateStr(new Date(d));
-        days.push({ date: new Date(d), dateStr: ds, isToday: ds === todayStr2, isHoliday: !!KR_HOLIDAYS_2026[ds], holidayName: KR_HOLIDAYS_2026[ds] || '', dow });
-      }
-      return days;
-    };
-
-    // 주 단위로 묶기 — index 0=일, 1=월, ..., 5=금, 6=토
-    const buildWeeks = (m: number) => {
-      const allDays = getDaysInMonth(m);
-      const allDaysMap: Record<string, typeof allDays[0]> = {};
-      allDays.forEach(d => { allDaysMap[d.dateStr] = d; });
-
-      const weeks: (typeof allDays[0] | null)[][] = [];
-      const firstDate = new Date(year, m - 1, 1);
-      let startSun = new Date(firstDate);
-      const dow = firstDate.getDay();
-      startSun.setDate(startSun.getDate() - dow); // 해당 주 일요일로
-
-      const lastDate = new Date(year, m, 0);
-      let endSat = new Date(lastDate);
-      const ldow = lastDate.getDay();
-      if (ldow !== 6) endSat.setDate(endSat.getDate() + (6 - ldow));
-
-      const cur = new Date(startSun);
-      while (cur <= endSat) {
-        const week: (typeof allDays[0] | null)[] = [];
-        for (let wd = 0; wd < 7; wd++) {
-          const ds = toDateStr(new Date(cur));
-          week.push(allDaysMap[ds] || null);
-          cur.setDate(cur.getDate() + 1);
-        }
-        weeks.push(week);
-      }
-      return weeks;
-    };
-
-    const weeks = buildWeeks(calMonth);
-
-    // Task 바 빌드 — 월~금은 week index 1~5
-    const buildTaskBars = () => {
-      const result: any[][] = weeks.map(() => []);
-      filtered.forEach((proj: any) => {
-        proj.tasks.forEach((task: any) => {
-          if (!task.startDate || !task.endDate) return;
-          const sd = parseDate(task.startDate);
-          const ed = parseDate(task.endDate);
-          weeks.forEach((week, wi) => {
-            const wdDays = week.slice(1, 6).filter(Boolean) as NonNullable<typeof week[0]>[];
-            if (!wdDays.length) return;
-            const weekStart = parseDate(wdDays[0].dateStr);
-            const weekEnd   = parseDate(wdDays[wdDays.length - 1].dateStr);
-            if (ed < weekStart || sd > weekEnd) return;
-
-            let colStart = 1, colEnd = 5;
-            for (let ci = 1; ci <= 5; ci++) {
-              if (!week[ci]) continue;
-              if (parseDate(week[ci]!.dateStr) >= sd) { colStart = ci; break; }
-              colStart = ci + 1;
-            }
-            for (let ci = 5; ci >= 1; ci--) {
-              if (!week[ci]) continue;
-              if (parseDate(week[ci]!.dateStr) <= ed) { colEnd = ci; break; }
-              colEnd = ci - 1;
-            }
-            if (colStart > colEnd) return;
-
-            const catColor = CATEGORY_COLORS[task.category] || CATEGORY_COLORS[proj.category];
-            const fallback = COLOR_MAP[proj.color] || COLOR_MAP.blue;
-            result[wi].push({
-              task, pid: proj.id,
-              color:   catColor ? catColor.border : fallback.bar,
-              colorBg: catColor ? catColor.bg     : fallback.barLight,
-              colStart, colSpan: colEnd - colStart + 1,
-              isStart: sd >= weekStart,
-              isEnd:   ed <= weekEnd,
-            });
-          });
-        });
-      });
-
-      result.forEach(bars => {
-        const laneEnds: number[] = [];
-        bars.sort((a: any, b: any) => a.colStart - b.colStart);
-        bars.forEach((bar: any) => {
-          const lane = laneEnds.findIndex(e => e < bar.colStart);
-          bar.lane = lane === -1 ? laneEnds.length : lane;
-          laneEnds[bar.lane] = bar.colStart + bar.colSpan - 1;
-        });
-      });
-      return result;
-    };
-
-    const taskBars = React.useMemo(() => buildTaskBars(), [calMonth, filtered]);
-
-    // 주별 독립 ROW_H — useMemo로 tooltip 리렌더 시 재계산 방지
-    const LANE_H   = 24;
-    const LANE_GAP = 3;
-    const CELL_PAD = 28;
-    const MIN_LANES = 2;
-
-    const weekRowHeights = React.useMemo(() => taskBars.map(bars => {
-      const lanes = bars.map((b: any) => b.lane);
-      const laneCount = Math.max(lanes.length ? Math.max(...lanes) + 1 : 0, MIN_LANES);
-      return CELL_PAD + laneCount * (LANE_H + LANE_GAP) + 8;
-    }), [taskBars]);
-
-    const calScrollRef = React.useRef<HTMLDivElement>(null);
-
-    // colStart(1~5=월~금) → 전체 그리드 기준 left unit
-    // 일(0.3) + (colStart-1)*1
-    const colToLeftUnit = (ci: number) => SAT_SUN_RATIO + (ci - 1);
-
-    return (
-      <>
-      <div ref={calScrollRef} style={{flex:1,overflowY:'auto',background:'#f8fafc',display:'flex',flexDirection:'column'}}>
-        {/* 월 네비게이션 */}
-        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'10px 20px',background:'white',borderBottom:'1px solid #e5e7eb',flexShrink:0}}>
-          <div style={{display:'flex',alignItems:'center',gap:12}}>
-            <button onClick={()=>setCalMonth((m: number)=>Math.max(1,m-1))} disabled={calMonth===1}
-              style={{width:30,height:30,borderRadius:8,border:'1px solid #e5e7eb',background:calMonth===1?'#f9fafb':'white',cursor:calMonth===1?'default':'pointer',fontSize:16,display:'flex',alignItems:'center',justifyContent:'center',color:calMonth===1?'#d1d5db':'#374151'}}>‹</button>
-            <span style={{fontSize:18,fontWeight:800,color:'#1e293b',minWidth:80,textAlign:'center'}}>2026년 {calMonth}월</span>
-            <button onClick={()=>setCalMonth((m: number)=>Math.min(12,m+1))} disabled={calMonth===12}
-              style={{width:30,height:30,borderRadius:8,border:'1px solid #e5e7eb',background:calMonth===12?'#f9fafb':'white',cursor:calMonth===12?'default':'pointer',fontSize:16,display:'flex',alignItems:'center',justifyContent:'center',color:calMonth===12?'#d1d5db':'#374151'}}>›</button>
-          </div>
-          <div style={{display:'flex',gap:10,alignItems:'center',flexWrap:'wrap'}}>
-            <span style={{fontSize:13,color:'#4b5563',fontWeight:700,marginRight:2}}>Task :</span>
-            {CATEGORIES.map(cat => {
-              const cc = CATEGORY_COLORS[cat];
-              return (
-                <div key={cat} style={{display:'flex',alignItems:'center',gap:4}}>
-                  <div style={{width:12,height:12,borderRadius:3,background:cc.border}}/>
-                  <span style={{fontSize:13,color:'#4b5563',fontWeight:600}}>{cat}</span>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* 요일 헤더 — 일 월 화 수 목 금 토 */}
-        <div style={{display:'grid',gridTemplateColumns:GRID_COLS,borderBottom:'2px solid #e2e8f0',background:'white',flexShrink:0}}>
-          {WEEKDAYS_ALL.map((wd, i) => {
-            const isSun = i === 0, isSat = i === 6;
-            return (
-              <div key={i} style={{
-                padding:'7px 0', textAlign:'center',
-                fontSize: 13,
-                fontWeight: 700,
-                color: isSun ? '#ef4444' : isSat ? '#2563eb' : '#374151',
-                borderRight: i < 6 ? '1px solid #e5e7eb' : 'none',
-                background: isSun ? '#fff5f5' : isSat ? '#eff6ff' : 'white',
-              }}>{wd}</div>
-            );
-          })}
-        </div>
-
-        {/* 주 행들 — flex:1로 남은 화면 높이 균등 분배 */}
-        <div style={{flex:1, display:'flex', flexDirection:'column'}}>
-          {weeks.map((week, wi) => {
-            const ROW_H = weekRowHeights[wi] || (CELL_PAD + MIN_LANES * (LANE_H + LANE_GAP) + 8);
-            return (
-            <div key={wi} style={{
-              display:'grid', gridTemplateColumns:GRID_COLS,
-              borderBottom:'1px solid #e5e7eb',
-              background:'white',
-              flex: 1,
-              minHeight: ROW_H,
-              position:'relative',
-            }}>
-              {/* 날짜 셀 — 0=일, 1~5=월~금, 6=토 */}
-              {week.map((day, di) => {
-                const isSun = di === 0, isSat = di === 6;
-                const isWeekend = isSun || isSat;
-                return (
-                  <div key={di} style={{
-                    borderRight: di < 6 ? `1px solid ${isWeekend ? '#e5e7eb' : '#f1f5f9'}` : 'none',
-                    minHeight: ROW_H,
-                    height: '100%',
-                    background: day?.isHoliday ? 'rgba(254,242,242,0.7)'
-                      : day?.isToday ? 'rgba(238,242,255,0.7)'
-                      : isSun ? 'rgba(255,245,245,0.4)'
-                      : isSat ? 'rgba(239,246,255,0.4)'
-                      : 'white',
-                    position:'relative',
-                    overflow:'hidden',
-                  }}>
-                    {day && (
-                      <div style={{
-                        position:'absolute',
-                        top: 5, left: 0, right: 0,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        fontSize: 12,
-                        fontWeight: day.isToday ? 800 : 500,
-                        color: day.isToday ? '#6366f1'
-                          : day.isHoliday ? '#ef4444'
-                          : isSun ? '#ef4444'
-                          : isSat ? '#2563eb'
-                          : '#374151',
-                        lineHeight: 1,
-                      }}>
-                        {day.date.getDate() === 1
-                          ? <span style={{fontWeight:800, fontSize: 12}}>
-                              {isWeekend ? day.date.getDate() : `${day.date.getMonth()+1}/${day.date.getDate()}`}
-                            </span>
-                          : day.date.getDate()
-                        }
-                      </div>
-                    )}
-                    {!isWeekend && day?.isHoliday && (
-                      <div style={{position:'absolute',top:5,right:4,fontSize:9,color:'#ef4444',fontWeight:600,whiteSpace:'nowrap',overflow:'hidden',maxWidth:55,textOverflow:'ellipsis'}}>
-                        {day.holidayName}
-                      </div>
-                    )}
-                    {day?.isToday && !isWeekend && (
-                      <div style={{position:'absolute',top:5,right:4,width:5,height:5,borderRadius:'50%',background:'#6366f1'}}/>
-                    )}
-                  </div>
-                );
-              })}
-
-              {/* Task 바 오버레이 */}
-              {taskBars[wi].map((bar: any, bi: number) => {
-                const topOffset = CELL_PAD + bar.lane * (LANE_H + LANE_GAP);
-                const prog = bar.task.progress || 0;
-                const catColor = CATEGORY_COLORS[bar.task.category];
-                const barBg      = catColor ? catColor.border : bar.color;
-                const barBgLight = catColor ? catColor.bg     : (bar.colorBg || '#bfdbfe');
-
-                const leftUnits  = colToLeftUnit(bar.colStart);
-                const rightUnits = colToLeftUnit(bar.colStart + bar.colSpan - 1) + 1;
-                const leftPct  = (leftUnits  / TOTAL_UNITS) * 100;
-                const widthPct = ((rightUnits - leftUnits) / TOTAL_UNITS) * 100;
-
-                return (
-                  <div key={bi}
-                    onClick={() => onEditTask(bar.task, bar.pid)}
-                    onMouseEnter={e => {
-                      if (localTooltipTimer.current) clearTimeout(localTooltipTimer.current);
-                      localTooltipTimer.current = setTimeout(() => {
-                        setLocalTooltip({ name: bar.task.name, startDate: bar.task.startDate, endDate: bar.task.endDate });
-                        setLocalTooltipPos({ x: e.clientX, y: e.clientY });
-                      }, 80);
-                    }}
-                    onMouseMove={e => setLocalTooltipPos({ x: e.clientX, y: e.clientY })}
-                    onMouseLeave={() => { if (localTooltipTimer.current) clearTimeout(localTooltipTimer.current); setLocalTooltip(null); }}
-                    style={{
-                      position:'absolute',
-                      left: `calc(${leftPct}% + ${bar.isStart ? 3 : 0}px)`,
-                      width: `calc(${widthPct}% - ${(bar.isStart ? 3 : 0) + (bar.isEnd ? 3 : 0)}px)`,
-                      top: topOffset,
-                      height: LANE_H,
-                      boxSizing: 'border-box' as const,
-                      background: barBgLight,
-                      borderRadius: `${bar.isStart?5:0}px ${bar.isEnd?5:0}px ${bar.isEnd?5:0}px ${bar.isStart?5:0}px`,
-                      border: `1px solid ${barBg}55`,
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      overflow: 'hidden',
-                      zIndex: 2,
-                      boxShadow: '0 1px 3px rgba(0,0,0,0.10)',
-                      flexShrink: 0,
-                    }}
-                  >
-                    <div style={{position:'absolute',left:0,top:0,width:`${prog}%`,height:'100%',background:barBg,borderRadius:'inherit',opacity:0.85,pointerEvents:'none'}}/>
-                    {bar.isStart ? (
-                      /* 시작 주: 이름 + 진행률 */
-                      <span style={{position:'relative',zIndex:1,fontSize:11,fontWeight:700,color:prog>40?'white':'#1f2937',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',paddingLeft:8,paddingRight:4,textShadow:prog>40?'0 1px 2px rgba(0,0,0,0.3)':'none',lineHeight:1,maxWidth:'100%'}}>
-                        {bar.task.name}
-                        {prog > 0 && <span style={{marginLeft:4,fontWeight:600,opacity:0.85}}>{prog}%</span>}
-                      </span>
-                    ) : (
-                      /* 이어지는 주: 점선 + 이름 반복 */
-                      <>
-                        <div style={{position:'relative',zIndex:1,width:3,height:'60%',borderLeft:'2px dashed rgba(255,255,255,0.7)',marginLeft:4,flexShrink:0}}/>
-                        <span style={{position:'relative',zIndex:1,fontSize:11,fontWeight:600,color:prog>40?'rgba(255,255,255,0.85)':'rgba(31,41,55,0.7)',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',paddingLeft:6,paddingRight:4,lineHeight:1,maxWidth:'100%',fontStyle:'italic'}}>
-                          {bar.task.name}
-                        </span>
-                      </>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          );
-          })}
-        </div>
-      </div>
-
-      {/* 로컬 툴팁 — 부모 state 건드리지 않아서 스크롤 튀기 없음 */}
-      {localTooltip && (
-        <div style={{position:'fixed',left:localTooltipPos.x+14,top:localTooltipPos.y-8,background:'#111827',color:'white',fontSize:13,padding:'10px 14px',borderRadius:8,whiteSpace:'nowrap',pointerEvents:'none',zIndex:99999,boxShadow:'0 4px 16px rgba(0,0,0,0.45)',lineHeight:1.7,border:'1px solid rgba(255,255,255,0.08)'}}>
-          {localTooltip.name && <div style={{fontWeight:700,marginBottom:4,color:'#f1f5f9',fontSize:14}}>{localTooltip.name}</div>}
-          <div style={{display:'flex',alignItems:'center',gap:6}}>
-            <span style={{color:'#6ee7b7',fontWeight:600,fontSize:13}}>▶</span>
-            <span style={{color:'#ffffff',fontWeight:600}}>{localTooltip.startDate}</span>
-            <span style={{color:'#9ca3af',fontSize:12,margin:'0 2px'}}>→</span>
-            <span style={{color:'#ffffff',fontWeight:600}}>{localTooltip.endDate}</span>
-          </div>
-          {localTooltip.startDate && KR_HOLIDAYS_2026[localTooltip.startDate] && (
-            <div style={{fontSize:11,color:'#fca5a5',marginTop:3}}>🗓️ {KR_HOLIDAYS_2026[localTooltip.startDate]}</div>
-          )}
-        </div>
-      )}
-      </>
-    );
-  };
-
-  // ── 분기보기 헤더 렌더링 ────────────────────────────────────
   const QuarterHeader = () => (
     <div style={{position:'sticky',top:0,zIndex:20,background:'white',borderBottom:'2px solid #e2e8f0',boxShadow:'0 1px 3px rgba(0,0,0,0.05)',width:totalW}}>
-      {/* 월 행 */}
       <div style={{display:'flex',height:22,borderBottom:'1px solid #e8ecf8'}}>
         <div style={{width:isCompactUI?22:LEFT_COL+ASSIGNEE_COL+SUB_COL,minWidth:isCompactUI?22:LEFT_COL+ASSIGNEE_COL+SUB_COL,flexShrink:0,background:'#f9fafb',borderRight:'1px solid #e5e7eb',position:'sticky',left:0,zIndex:10}} />
         <div style={{display:'flex',width:TIMELINE_W,minWidth:TIMELINE_W,flexShrink:0,overflow:'hidden'}}>
-          {WEEK_HEADERS.reduce((acc: any[], h: any) => {
-            if (h.isFirstOfMonth || acc.length === 0) acc.push({ month: h.month, count: 1 });
-            else acc[acc.length - 1].count++;
-            return acc;
-          }, []).map((seg: any, i: number) => (
-            <div key={i} style={{
-              width: seg.count * MONTH_COL, minWidth: seg.count * MONTH_COL, flexShrink:0,
-              height:22, background: ['#eff6ff','#f0fdf4','#fef3c7','#fdf4ff','#fff7ed','#f0fdfa','#fefce8','#faf5ff','#fff1f2','#f0f9ff','#fefce8','#f5f3ff'][i%12],
-              borderRight:'1px solid #e8ecf8', display:'flex', alignItems:'center', justifyContent:'center', overflow:'hidden',
-            }}>
+          {WEEK_HEADERS.reduce((acc: any[], h: any) => { if (h.isFirstOfMonth || acc.length === 0) acc.push({ month: h.month, count: 1 }); else acc[acc.length - 1].count++; return acc; }, []).map((seg: any, i: number) => (
+            <div key={i} style={{width:seg.count*MONTH_COL,minWidth:seg.count*MONTH_COL,flexShrink:0,height:22,background:['#eff6ff','#f0fdf4','#fef3c7','#fdf4ff','#fff7ed','#f0fdfa','#fefce8','#faf5ff','#fff1f2','#f0f9ff','#fefce8','#f5f3ff'][i%12],borderRight:'1px solid #e8ecf8',display:'flex',alignItems:'center',justifyContent:'center',overflow:'hidden'}}>
               <span style={{fontSize:11,fontWeight:700,color:'#374151',whiteSpace:'nowrap'}}>{seg.month}월</span>
             </div>
           ))}
         </div>
       </div>
-      {/* 주(W) 행 */}
       <div style={{display:'flex',height:22}}>
         {isCompactUI ? (
           <div style={{width:22,minWidth:22,flexShrink:0,background:'#f9fafb',borderRight:'1px solid #e5e7eb',position:'sticky',left:0,zIndex:10}} />
@@ -1673,16 +1464,7 @@ function GanttChart({ user, appId, onAppChange, onLogout }: { user: any; appId: 
         </>)}
         <div style={{display:'flex',width:TIMELINE_W,minWidth:TIMELINE_W,flexShrink:0,overflow:'hidden'}}>
           {WEEK_HEADERS.map((h,i)=>(
-            <div key={i} style={{
-              width:MONTH_COL, minWidth:MONTH_COL, flexShrink:0,
-              display:'flex', alignItems:'center', justifyContent:'center',
-              fontSize:11, fontWeight: h.isFirstOfMonth ? 700 : 400,
-              color: h.isFirstOfMonth ? '#1d4ed8' : '#6b7280',
-              borderRight:'1px solid #e8ecf8',
-              background: h.isFirstOfMonth ? '#eff6ff' : '#f9fafb',
-            }}>
-              {h.label}
-            </div>
+            <div key={i} style={{width:MONTH_COL,minWidth:MONTH_COL,flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,fontWeight:h.isFirstOfMonth?700:400,color:h.isFirstOfMonth?'#1d4ed8':'#6b7280',borderRight:'1px solid #e8ecf8',background:h.isFirstOfMonth?'#eff6ff':'#f9fafb'}}>{h.label}</div>
           ))}
         </div>
       </div>
@@ -1690,80 +1472,49 @@ function GanttChart({ user, appId, onAppChange, onLogout }: { user: any; appId: 
   );
 
   return (
-    <div style={{height:'100dvh',width:'100%',background:'#eef0f5',display:'flex',flexDirection:'column',overflow:'hidden',fontFamily:"'Pretendard',-apple-system,BlinkMacSystemFont,sans-serif",
-      paddingTop:'env(safe-area-inset-top)',
-      paddingBottom:'env(safe-area-inset-bottom)',
-      paddingLeft:'env(safe-area-inset-left)',
-      paddingRight:'env(safe-area-inset-right)',
-    }}>
-      <style>{`
-        @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
-        @keyframes spin{to{transform:rotate(360deg)}}
-        @keyframes fadeInDown{from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:translateY(0)}}
-        *{box-sizing:border-box; font-family:'Pretendard',-apple-system,BlinkMacSystemFont,sans-serif;}
-      `}</style>
+    <div style={{height:'100dvh',width:'100%',background:'#eef0f5',display:'flex',flexDirection:'column',overflow:'hidden',fontFamily:"'Pretendard',-apple-system,BlinkMacSystemFont,sans-serif",paddingTop:'env(safe-area-inset-top)',paddingBottom:'env(safe-area-inset-bottom)',paddingLeft:'env(safe-area-inset-left)',paddingRight:'env(safe-area-inset-right)'}}>
+      <style>{`@import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css'); @keyframes spin{to{transform:rotate(360deg)}} @keyframes fadeInDown{from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:translateY(0)}} *{box-sizing:border-box;font-family:'Pretendard',-apple-system,BlinkMacSystemFont,sans-serif;color-scheme:light;} html,body{color-scheme:light;}`}</style>
 
-      {/* Header */}
+      {/* ── 데스크탑 헤더 ── */}
       <div ref={headerRef} style={{background:'linear-gradient(135deg,#0f0f1a 0%,#1a1a2e 60%,#16213e 100%)',borderBottom:'1px solid rgba(255,255,255,0.08)',padding:isCompactUI?'6px 16px':'16px 24px',flexShrink:0,boxShadow:'0 2px 16px rgba(0,0,0,0.4)',position:'sticky',top:0,zIndex:30}}>
         {isCompactUI ? (
           <>
             <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:5}}>
               <div style={{display:'flex',background:'rgba(255,255,255,0.07)',borderRadius:8,padding:3,border:'1px solid rgba(255,255,255,0.1)',gap:1}}>
                 {([2,1] as const).map(id=>(
-                  <button key={id} onClick={()=>onAppChange(id)} style={{padding:'4px 12px',borderRadius:6,border:'none',cursor:'pointer',fontSize:12,fontWeight:appId===id?700:400,
-                    background:appId===id?'linear-gradient(135deg,#6366f1,#8b5cf6)':'transparent',
-                    color:appId===id?'#fff':'rgba(148,163,184,0.7)'}}>
+                  <button key={id} onClick={()=>onAppChange(id)} style={{padding:'4px 12px',borderRadius:6,border:'none',cursor:'pointer',fontSize:12,fontWeight:appId===id?700:400,background:appId===id?'linear-gradient(135deg,#6366f1,#8b5cf6)':'transparent',color:appId===id?'#fff':'rgba(148,163,184,0.7)'}}>
                     {id===2?'샌디앱':'통근버스'}
                   </button>
                 ))}
               </div>
               <div style={{width:1,height:18,background:'rgba(255,255,255,0.15)'}}/>
-              {/* ── 뷰모드 + 분기점프 통합 버튼 (컴팩트) ── */}
               <div style={{display:'flex',alignItems:'center',background:'rgba(255,255,255,0.07)',borderRadius:8,padding:2,border:'1px solid rgba(255,255,255,0.12)',gap:0}}>
-                <button onClick={()=>switchViewMode('year')}
-                  style={{padding:'4px 10px',borderRadius:6,border:'none',cursor:'pointer',fontSize:12,fontWeight:viewMode==='year'?700:400,background:viewMode==='year'?'rgba(99,102,241,0.9)':'transparent',color:viewMode==='year'?'white':'rgba(148,163,184,0.8)'}}>년</button>
-                <button onClick={()=>switchViewMode('quarter')}
-                  style={{padding:'4px 9px',borderRadius:6,border:'none',cursor:'pointer',fontSize:12,fontWeight:viewMode==='quarter'?700:400,background:viewMode==='quarter'?'rgba(99,102,241,0.9)':'transparent',color:viewMode==='quarter'?'white':'rgba(148,163,184,0.8)'}}>분기</button>
-                {/* 1Q~4Q 인라인 */}
-                <div style={{display:'flex',borderLeft:'1px solid rgba(255,255,255,0.1)',marginLeft:1,paddingLeft:1}}>
-                  {QUARTERS.map((q,i)=>(
-                    <button key={q.label}
-                      onClick={()=>{ if(viewMode!=='quarter') switchViewMode('quarter'); jumpToQuarter(i); }}
-                      style={{padding:'4px 7px',borderRadius:5,border:'none',cursor:'pointer',fontSize:10,fontWeight:700,
-                        background: viewMode==='quarter' ? 'rgba(99,102,241,0.25)' : 'transparent',
-                        color: viewMode==='quarter' ? '#c7d2fe' : 'rgba(148,163,184,0.4)',
-                        transition:'all 0.15s'}}
-                      onMouseEnter={e=>(e.currentTarget.style.background='rgba(99,102,241,0.4)')}
-                      onMouseLeave={e=>(e.currentTarget.style.background=viewMode==='quarter'?'rgba(99,102,241,0.25)':'transparent')}>
-                      {q.label}
-                    </button>
-                  ))}
+                <button onClick={()=>switchViewMode('month')} style={{padding:'4px 10px',borderRadius:6,border:'none',cursor:'pointer',fontSize:12,fontWeight:viewMode==='month'?700:400,background:viewMode==='month'?'rgba(99,102,241,0.9)':'transparent',color:viewMode==='month'?'white':'rgba(148,163,184,0.8)'}}>월</button>
+                <div style={{borderLeft:'1px solid rgba(255,255,255,0.1)',marginLeft:1,paddingLeft:1,display:'flex',alignItems:'center'}}>
+                  <button onClick={()=>switchViewMode('quarter')} style={{padding:'4px 9px',borderRadius:6,border:'none',cursor:'pointer',fontSize:12,fontWeight:viewMode==='quarter'?700:400,background:viewMode==='quarter'?'rgba(99,102,241,0.9)':'transparent',color:viewMode==='quarter'?'white':'rgba(148,163,184,0.8)'}}>분기</button>
+                  <div style={{display:'flex',borderLeft:'1px solid rgba(255,255,255,0.1)',marginLeft:1,paddingLeft:1}}>
+                    {QUARTERS.map((q,i)=>(<button key={q.label} onClick={()=>{if(viewMode!=='quarter')switchViewMode('quarter');jumpToQuarter(i);}} style={{padding:'4px 7px',borderRadius:5,border:'none',cursor:'pointer',fontSize:10,fontWeight:700,background:viewMode==='quarter'?'rgba(99,102,241,0.25)':'transparent',color:viewMode==='quarter'?'#c7d2fe':'rgba(148,163,184,0.4)',transition:'all 0.15s'}} onMouseEnter={e=>(e.currentTarget.style.background='rgba(99,102,241,0.4)')} onMouseLeave={e=>(e.currentTarget.style.background=viewMode==='quarter'?'rgba(99,102,241,0.25)':'transparent')}>{q.label}</button>))}
+                  </div>
                 </div>
                 <div style={{borderLeft:'1px solid rgba(255,255,255,0.1)',marginLeft:1,paddingLeft:1}}>
-                  <button onClick={()=>switchViewMode('month')}
-                    style={{padding:'4px 10px',borderRadius:6,border:'none',cursor:'pointer',fontSize:12,fontWeight:viewMode==='month'?700:400,background:viewMode==='month'?'rgba(99,102,241,0.9)':'transparent',color:viewMode==='month'?'white':'rgba(148,163,184,0.8)'}}>월</button>
+                  <button onClick={()=>switchViewMode('year')} style={{padding:'4px 10px',borderRadius:6,border:'none',cursor:'pointer',fontSize:12,fontWeight:viewMode==='year'?700:400,background:viewMode==='year'?'rgba(99,102,241,0.9)':'transparent',color:viewMode==='year'?'white':'rgba(148,163,184,0.8)'}}>년</button>
                 </div>
               </div>
               <div style={{flex:1}}/>
               {saving && <div style={{display:'flex',alignItems:'center',gap:4,fontSize:11,color:'#4ade80'}}><div style={{width:8,height:8,border:'2px solid #4ade80',borderTopColor:'transparent',borderRadius:'50%',animation:'spin 0.8s linear infinite'}}/>저장중</div>}
               {realtimeToast && <span style={{fontSize:11,color:'#4ade80',fontWeight:600,animation:'fadeInDown 0.3s ease'}}>🔄 업데이트</span>}
+              {/* ★ compact UI undo/redo 버튼 */}
+              <UndoRedoButtons size="sm" />
               <button onClick={addProject} style={{padding:'4px 12px',background:'linear-gradient(135deg,#6366f1,#8b5cf6)',color:'white',border:'none',borderRadius:7,cursor:'pointer',fontSize:12,fontWeight:600}}>+ 추가</button>
               <button onClick={onLogout} style={{padding:'4px 10px',background:'rgba(239,68,68,0.15)',border:'1px solid rgba(239,68,68,0.25)',borderRadius:7,cursor:'pointer',fontSize:11,color:'#fca5a5'}}>로그아웃</button>
             </div>
             <div style={{display:'flex',gap:4,alignItems:'center',flexWrap:'wrap'}}>
-              <button onClick={()=>setActiveCategories([])} style={{padding:'3px 10px',borderRadius:14,fontSize:11,cursor:'pointer',fontWeight:activeCategories.length===0?600:400,border:activeCategories.length===0?'1.5px solid #818cf8':'1.5px solid rgba(255,255,255,0.3)',background:activeCategories.length===0?'rgba(99,102,241,0.35)':'rgba(255,255,255,0.08)',color:activeCategories.length===0?'#fff':'#e2e8f0'}}>전체 {projects.length}</button>
-              {CATEGORIES.map(cat=>{const isActive=activeCategories.includes(cat);const cc=CATEGORY_COLORS[cat];return(
-                <button key={cat} onClick={()=>setActiveCategories(prev=>prev.includes(cat)?prev.filter(c=>c!==cat):[...prev,cat])} style={{padding:'3px 10px',borderRadius:14,fontSize:11,cursor:'pointer',fontWeight:isActive?600:400,border:isActive?`1.5px solid ${cc.border}`:'1.5px solid rgba(255,255,255,0.3)',background:isActive?`${cc.bg}22`:'rgba(255,255,255,0.08)',color:isActive?cc.border:'#e2e8f0',display:'flex',alignItems:'center',gap:4}}>
-                  <span style={{width:7,height:7,borderRadius:'50%',background:cc.border,flexShrink:0,display:'inline-block'}}/>
-                  {cat}
-                </button>
-              );})}
+              <button onClick={()=>setActiveCategories([])} style={{padding:'3px 10px',borderRadius:14,fontSize:11,cursor:'pointer',fontWeight:activeCategories.length===0?600:400,border:activeCategories.length===0?'1.5px solid #818cf8':'1.5px solid rgba(255,255,255,0.3)',background:activeCategories.length===0?'rgba(99,102,241,0.35)':'rgba(255,255,255,0.08)',color:activeCategories.length===0?'#fff':'#e2e8f0'}}>전체 {projects.filter((p:any)=>p.category!=='영업').reduce((s:any,p:any)=>s+p.tasks.length,0)}</button>
+              {CATEGORIES.map(cat=>{const isActive=activeCategories.includes(cat);const cc=CATEGORY_COLORS[cat];return(<button key={cat} onClick={()=>setActiveCategories(prev=>prev.includes(cat)?prev.filter(c=>c!==cat):[...prev,cat])} style={{padding:'3px 10px',borderRadius:14,fontSize:11,cursor:'pointer',fontWeight:isActive?600:400,border:isActive?`1.5px solid ${cc.border}`:'1.5px solid rgba(255,255,255,0.3)',background:isActive?`${cc.bg}22`:'rgba(255,255,255,0.08)',color:isActive?cc.border:'#e2e8f0',display:'flex',alignItems:'center',gap:4}}><span style={{width:7,height:7,borderRadius:'50%',background:cc.border,flexShrink:0,display:'inline-block'}}/>{cat}</button>);})}
               {allGroups.length>0 && <>
                 <div style={{width:1,height:14,background:'rgba(255,255,255,0.25)'}}/>
                 <button onClick={()=>setActiveGroup('')} style={{padding:'3px 10px',borderRadius:14,fontSize:11,cursor:'pointer',fontWeight:activeGroup===''?600:400,border:activeGroup===''?'1.5px solid #818cf8':'1.5px solid rgba(255,255,255,0.3)',background:activeGroup===''?'rgba(99,102,241,0.35)':'rgba(255,255,255,0.08)',color:activeGroup===''?'#fff':'#e2e8f0'}}>전체그룹</button>
-                {allGroups.map(g=>(
-                  <button key={g} onClick={()=>setActiveGroup(prev=>prev===g?'':g)} style={{padding:'3px 10px',borderRadius:14,fontSize:11,cursor:'pointer',fontWeight:activeGroup===g?600:400,border:activeGroup===g?'1.5px solid #818cf8':'1.5px solid rgba(255,255,255,0.3)',background:activeGroup===g?'rgba(99,102,241,0.35)':'rgba(255,255,255,0.08)',color:activeGroup===g?'#fff':'#e2e8f0'}}>{g}</button>
-                ))}
+                {allGroups.map(g=>(<button key={g} onClick={()=>setActiveGroup(prev=>prev===g?'':g)} style={{padding:'3px 10px',borderRadius:14,fontSize:11,cursor:'pointer',fontWeight:activeGroup===g?600:400,border:activeGroup===g?'1.5px solid #818cf8':'1.5px solid rgba(255,255,255,0.3)',background:activeGroup===g?'rgba(99,102,241,0.35)':'rgba(255,255,255,0.08)',color:activeGroup===g?'#fff':'#e2e8f0'}}>{g}</button>))}
               </>}
               <div style={{marginLeft:'auto',display:'flex',alignItems:'center',gap:4}}>
                 <div style={{width:1,height:14,background:'rgba(255,255,255,0.25)'}}/>
@@ -1774,147 +1525,90 @@ function GanttChart({ user, appId, onAppChange, onLogout }: { user: any; appId: 
           </>
         ) : (
           <>
-        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:8}}>
-          <div style={{display:'flex',alignItems:'center',gap:12}}>
-            <div>
-              <div style={{display:'flex',alignItems:'center',gap:0,background:'rgba(255,255,255,0.07)',borderRadius:10,padding:4,border:'1px solid rgba(255,255,255,0.1)'}}>
-                {([2,1] as const).map(id => (
-                  <button key={id} onClick={()=>onAppChange(id)}
-                    style={{display:'flex',alignItems:'center',gap:6,padding:'7px 16px',borderRadius:8,border:'none',cursor:'pointer',transition:'all 0.2s',
-                      background: appId===id ? 'linear-gradient(135deg,#6366f1,#8b5cf6)' : 'transparent',
-                      color: appId===id ? '#fff' : 'rgba(148,163,184,0.7)',
-                      fontWeight: appId===id ? 700 : 400, fontSize: 14,
-                      boxShadow: appId===id ? '0 2px 8px rgba(99,102,241,0.4)' : 'none'}}>
-                    {id===2 ? '샌디앱 간트차트' : '통근버스 간트차트'}
-                  </button>
-                ))}
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:8}}>
+              <div style={{display:'flex',flexDirection:'column',gap:4}}>
+                <div style={{display:'flex',alignItems:'center',gap:8}}>
+                  <div style={{display:'flex',alignItems:'center',gap:0,background:'rgba(255,255,255,0.07)',borderRadius:10,padding:4,border:'1px solid rgba(255,255,255,0.1)'}}>
+                    {([2,1] as const).map(id => (
+                      <button key={id} onClick={()=>onAppChange(id)} style={{display:'flex',alignItems:'center',padding:'7px 16px',borderRadius:8,border:'none',cursor:'pointer',transition:'all 0.2s',background:appId===id?'linear-gradient(135deg,#6366f1,#8b5cf6)':'transparent',color:appId===id?'#fff':'rgba(148,163,184,0.7)',fontWeight:appId===id?700:400,fontSize:14,boxShadow:appId===id?'0 2px 8px rgba(99,102,241,0.4)':'none'}}>
+                        {id===2?'샌디앱':'샌디버스'}
+                      </button>
+                    ))}
+                  </div>
+                  {/* ★ undo/redo - 탭과 같은 높이로 나란히 */}
+                  <UndoRedoButtons size="md" />
+                </div>
+                <div style={{display:'flex',alignItems:'center',gap:8}}>
+                  <p style={{fontSize:11,color:'rgba(148,163,184,0.8)',margin:0}}>2026년 · Supabase 연동 · 실시간 동기화 🟢</p>
+                  {realtimeToast && <span style={{fontSize:11,color:'#4ade80',background:'rgba(74,222,128,0.12)',padding:'2px 8px',borderRadius:10,border:'1px solid rgba(74,222,128,0.25)',fontWeight:600,animation:'fadeInDown 0.3s ease',display:'flex',alignItems:'center',gap:4}}>🔄 다른 팀원이 업데이트했습니다</span>}
+                </div>
               </div>
-              <div style={{display:'flex',alignItems:'center',gap:8,marginTop:2}}>
-                <p style={{fontSize:11,color:'rgba(148,163,184,0.8)',margin:0}}>2026년 · Supabase 연동 · 실시간 동기화 🟢</p>
-                {realtimeToast && <span style={{fontSize:11,color:'#4ade80',background:'rgba(74,222,128,0.12)',padding:'2px 8px',borderRadius:10,border:'1px solid rgba(74,222,128,0.25)',fontWeight:600,animation:'fadeInDown 0.3s ease',display:'flex',alignItems:'center',gap:4}}>🔄 다른 팀원이 업데이트했습니다</span>}
-              </div>
-            </div>
-          </div>
-          <div style={{display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
-            {saving && <div style={{display:'flex',alignItems:'center',gap:5,fontSize:11,color:'#4ade80',background:'rgba(74,222,128,0.1)',padding:'4px 10px',borderRadius:20,border:'1px solid rgba(74,222,128,0.2)'}}><div style={{width:10,height:10,border:'2px solid #4ade80',borderTopColor:'transparent',borderRadius:'50%',animation:'spin 0.8s linear infinite'}} />저장 중...</div>}
-            <div style={{position:'relative'}}>
-              <span style={{position:'absolute',left:9,top:'50%',transform:'translateY(-50%)',color:'rgba(148,163,184,0.6)',fontSize:12}}>🔍</span>
-              <input type="text" placeholder="검색..." value={searchQuery} onChange={e=>setSearchQuery(e.target.value)}
-                style={{paddingLeft:28,paddingRight:10,height:30,border:'1px solid rgba(255,255,255,0.12)',borderRadius:7,width:150,fontSize:12,outline:'none',background:'rgba(255,255,255,0.07)',color:'#f1f5f9'}} />
-            </div>
-            <button onClick={loadHistory} style={{display:'flex',alignItems:'center',gap:5,height:30,padding:'0 11px',background:'rgba(124,58,237,0.85)',color:'white',border:'1px solid rgba(167,139,250,0.3)',borderRadius:7,cursor:'pointer',fontSize:12,fontWeight:500}}>🕐 히스토리</button>
-            <button onClick={exportXLSX} style={{display:'flex',alignItems:'center',gap:5,height:30,padding:'0 11px',background:'rgba(22,163,74,0.85)',color:'white',border:'1px solid rgba(74,222,128,0.2)',borderRadius:7,cursor:'pointer',fontSize:12,fontWeight:500}}>⬇ Excel</button>
-            <label style={{display:'flex',alignItems:'center',gap:5,height:30,padding:'0 11px',background:'rgba(59,130,246,0.85)',color:'white',border:'1px solid rgba(96,165,250,0.3)',borderRadius:7,cursor:'pointer',fontSize:12,fontWeight:500}}>
-              ⬆ Excel 업로드
-              <input type="file" accept=".xlsx,.xls" onChange={handleImportXLSX} style={{display:'none'}} />
-            </label>
-
-            {/* ── 뷰모드 + 분기점프 통합 버튼 ── */}
-            <div style={{display:'flex',alignItems:'center',background:'rgba(255,255,255,0.07)',borderRadius:8,border:'1px solid rgba(255,255,255,0.12)',padding:2,gap:1}}>
-              <span style={{fontSize:10,color:'rgba(148,163,184,0.5)',padding:'0 4px',userSelect:'none'}}>🔍</span>
-              {/* 년 */}
-              <button onClick={()=>switchViewMode('year')} title="연간 전체 보기"
-                style={{height:26,padding:'0 12px',borderRadius:6,border:'none',cursor:'pointer',fontSize:12,fontWeight:viewMode==='year'?700:400,background:viewMode==='year'?'rgba(99,102,241,0.9)':'transparent',color:viewMode==='year'?'white':'rgba(148,163,184,0.8)',transition:'all 0.15s'}}>
-                년
-              </button>
-              {/* 분기 + 1Q~4Q 인라인 */}
-              <button onClick={()=>switchViewMode('quarter')} title="분기별 주단위 보기"
-                style={{height:26,padding:'0 10px',borderRadius:6,border:'none',cursor:'pointer',fontSize:12,fontWeight:viewMode==='quarter'?700:400,background:viewMode==='quarter'?'rgba(99,102,241,0.9)':'transparent',color:viewMode==='quarter'?'white':'rgba(148,163,184,0.8)',transition:'all 0.15s'}}>
-                분기
-              </button>
-              {/* 1Q~4Q — 분기 버튼 바로 옆에 */}
-              <div style={{display:'flex',alignItems:'center',gap:0,borderLeft:'1px solid rgba(255,255,255,0.1)',marginLeft:1,paddingLeft:1}}>
-                {QUARTERS.map((q,i)=>(
-                  <button key={q.label}
-                    onClick={()=>{ if(viewMode!=='quarter') switchViewMode('quarter'); jumpToQuarter(i); }}
-                    title={`${q.label}로 이동`}
-                    style={{height:26,padding:'0 9px',borderRadius:6,border:'none',cursor:'pointer',fontSize:11,fontWeight:700,
-                      background: viewMode==='quarter' ? 'rgba(99,102,241,0.25)' : 'transparent',
-                      color: viewMode==='quarter' ? '#c7d2fe' : 'rgba(148,163,184,0.4)',
-                      transition:'all 0.15s'}}
-                    onMouseEnter={e=>(e.currentTarget.style.background='rgba(99,102,241,0.4)')}
-                    onMouseLeave={e=>(e.currentTarget.style.background=viewMode==='quarter'?'rgba(99,102,241,0.25)':'transparent')}>
-                    {q.label}
-                  </button>
-                ))}
-              </div>
-              {/* 월 */}
-              <div style={{borderLeft:'1px solid rgba(255,255,255,0.1)',marginLeft:1,paddingLeft:1}}>
-                <button onClick={()=>switchViewMode('month')} title="월 캘린더 보기"
-                  style={{height:26,padding:'0 12px',borderRadius:6,border:'none',cursor:'pointer',fontSize:12,fontWeight:viewMode==='month'?700:400,background:viewMode==='month'?'rgba(99,102,241,0.9)':'transparent',color:viewMode==='month'?'white':'rgba(148,163,184,0.8)',transition:'all 0.15s'}}>
-                  월
-                </button>
+              <div style={{display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
+                {saving && <div style={{display:'flex',alignItems:'center',gap:5,fontSize:11,color:'#4ade80',background:'rgba(74,222,128,0.1)',padding:'4px 10px',borderRadius:20,border:'1px solid rgba(74,222,128,0.2)'}}><div style={{width:10,height:10,border:'2px solid #4ade80',borderTopColor:'transparent',borderRadius:'50%',animation:'spin 0.8s linear infinite'}} />저장 중...</div>}
+                <div style={{position:'relative'}}>
+                  <span style={{position:'absolute',left:9,top:'50%',transform:'translateY(-50%)',color:'rgba(148,163,184,0.6)',fontSize:12}}>🔍</span>
+                  <input type="text" placeholder="검색..." value={searchQuery} onChange={e=>setSearchQuery(e.target.value)} style={{paddingLeft:28,paddingRight:10,height:32,border:'1px solid rgba(255,255,255,0.12)',borderRadius:7,width:150,fontSize:12,outline:'none',background:'rgba(255,255,255,0.07)',color:'#f1f5f9'}} />
+                </div>
+                <button onClick={loadHistory} style={{display:'flex',alignItems:'center',gap:5,height:32,padding:'0 11px',background:'rgba(124,58,237,0.85)',color:'white',border:'1px solid rgba(167,139,250,0.3)',borderRadius:7,cursor:'pointer',fontSize:12,fontWeight:500}}>🕐 히스토리</button>
+                <button onClick={exportXLSX} style={{display:'flex',alignItems:'center',gap:5,height:32,padding:'0 11px',background:'rgba(22,163,74,0.85)',color:'white',border:'1px solid rgba(74,222,128,0.2)',borderRadius:7,cursor:'pointer',fontSize:12,fontWeight:500}}>⬇ Excel</button>
+                <label style={{display:'flex',alignItems:'center',gap:5,height:32,padding:'0 11px',background:'rgba(59,130,246,0.85)',color:'white',border:'1px solid rgba(96,165,250,0.3)',borderRadius:7,cursor:'pointer',fontSize:12,fontWeight:500}}>
+                  ⬆ Excel 업로드
+                  <input type="file" accept=".xlsx,.xls" onChange={handleImportXLSX} style={{display:'none'}} />
+                </label>
+                <div style={{display:'flex',alignItems:'center',background:'rgba(255,255,255,0.07)',borderRadius:8,border:'1px solid rgba(255,255,255,0.12)',padding:2,gap:1,height:32,boxSizing:'border-box'}}>
+                  <span style={{fontSize:10,color:'rgba(148,163,184,0.5)',padding:'0 4px',userSelect:'none'}}>🔍</span>
+                  <button onClick={()=>switchViewMode('month')} title="월 캘린더 보기" style={{height:28,padding:'0 12px',borderRadius:6,border:'none',cursor:'pointer',fontSize:12,fontWeight:viewMode==='month'?700:400,background:viewMode==='month'?'rgba(99,102,241,0.9)':'transparent',color:viewMode==='month'?'white':'rgba(148,163,184,0.8)',transition:'all 0.15s'}}>월</button>
+                  <div style={{display:'flex',alignItems:'center',borderLeft:'1px solid rgba(255,255,255,0.1)',marginLeft:1,paddingLeft:1}}>
+                    <button onClick={()=>switchViewMode('quarter')} title="분기별 주단위 보기" style={{height:28,padding:'0 10px',borderRadius:6,border:'none',cursor:'pointer',fontSize:12,fontWeight:viewMode==='quarter'?700:400,background:viewMode==='quarter'?'rgba(99,102,241,0.9)':'transparent',color:viewMode==='quarter'?'white':'rgba(148,163,184,0.8)',transition:'all 0.15s'}}>분기</button>
+                    <div style={{display:'flex',alignItems:'center',gap:0,borderLeft:'1px solid rgba(255,255,255,0.1)',marginLeft:1,paddingLeft:1}}>
+                      {QUARTERS.map((q,i)=>(<button key={q.label} onClick={()=>{if(viewMode!=='quarter')switchViewMode('quarter');jumpToQuarter(i);}} title={`${q.label}로 이동`} style={{height:28,padding:'0 9px',borderRadius:6,border:'none',cursor:'pointer',fontSize:11,fontWeight:700,background:viewMode==='quarter'?'rgba(99,102,241,0.25)':'transparent',color:viewMode==='quarter'?'#c7d2fe':'rgba(148,163,184,0.4)',transition:'all 0.15s'}} onMouseEnter={e=>(e.currentTarget.style.background='rgba(99,102,241,0.4)')} onMouseLeave={e=>(e.currentTarget.style.background=viewMode==='quarter'?'rgba(99,102,241,0.25)':'transparent')}>{q.label}</button>))}
+                    </div>
+                  </div>
+                  <div style={{borderLeft:'1px solid rgba(255,255,255,0.1)',marginLeft:1,paddingLeft:1}}>
+                    <button onClick={()=>switchViewMode('year')} title="연간 전체 보기" style={{height:28,padding:'0 12px',borderRadius:6,border:'none',cursor:'pointer',fontSize:12,fontWeight:viewMode==='year'?700:400,background:viewMode==='year'?'rgba(99,102,241,0.9)':'transparent',color:viewMode==='year'?'white':'rgba(148,163,184,0.8)',transition:'all 0.15s'}}>년</button>
+                  </div>
+                </div>
+                <button onClick={addProject} style={{display:'flex',alignItems:'center',gap:5,height:32,padding:'0 13px',background:'linear-gradient(135deg,#6366f1,#8b5cf6)',color:'white',border:'none',borderRadius:7,cursor:'pointer',fontSize:12,fontWeight:600,boxShadow:'0 2px 6px rgba(99,102,241,0.4)'}}>+ 프로젝트 추가</button>
+                <div style={{display:'flex',alignItems:'center',gap:6,paddingLeft:8,borderLeft:'1px solid rgba(255,255,255,0.12)'}}>
+                  <span style={{fontSize:11,color:'rgba(148,163,184,0.6)',maxWidth:110,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{user.email}</span>
+                  <button onClick={()=>setShowChangePw(true)} style={{height:32,padding:'0 9px',background:'rgba(255,255,255,0.07)',border:'1px solid rgba(255,255,255,0.12)',borderRadius:7,cursor:'pointer',fontSize:11,color:'rgba(148,163,184,0.8)',fontWeight:500,display:'flex',alignItems:'center'}}>🔑 비번변경</button>
+                  <button onClick={onLogout} style={{height:32,padding:'0 9px',background:'rgba(239,68,68,0.15)',border:'1px solid rgba(239,68,68,0.25)',borderRadius:7,cursor:'pointer',fontSize:11,color:'#fca5a5',fontWeight:500,display:'flex',alignItems:'center'}}>로그아웃</button>
+                </div>
               </div>
             </div>
-
-            <button onClick={addProject} style={{display:'flex',alignItems:'center',gap:5,height:30,padding:'0 13px',background:'linear-gradient(135deg,#6366f1,#8b5cf6)',color:'white',border:'none',borderRadius:7,cursor:'pointer',fontSize:12,fontWeight:600,boxShadow:'0 2px 6px rgba(99,102,241,0.4)'}}>+ 프로젝트 추가</button>
-            <div style={{display:'flex',alignItems:'center',gap:6,paddingLeft:8,borderLeft:'1px solid rgba(255,255,255,0.12)'}}>
-              <span style={{fontSize:11,color:'rgba(148,163,184,0.6)',maxWidth:110,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{user.email}</span>
-              <button onClick={()=>setShowChangePw(true)} style={{height:30,padding:'0 9px',background:'rgba(255,255,255,0.07)',border:'1px solid rgba(255,255,255,0.12)',borderRadius:7,cursor:'pointer',fontSize:11,color:'rgba(148,163,184,0.8)',fontWeight:500,display:'flex',alignItems:'center'}}>🔑 비번변경</button>
-              <button onClick={onLogout} style={{height:30,padding:'0 9px',background:'rgba(239,68,68,0.15)',border:'1px solid rgba(239,68,68,0.25)',borderRadius:7,cursor:'pointer',fontSize:11,color:'#fca5a5',fontWeight:500,display:'flex',alignItems:'center'}}>로그아웃</button>
+            <div style={{display:'flex',gap:6,marginTop:12,alignItems:'center',flexWrap:'wrap'}}>
+              <span style={{fontSize:12,color:'#e2e8f0',flexShrink:0,fontWeight:600}}>업무유형:</span>
+              <button onClick={()=>setActiveCategories([])} style={{padding:'5px 14px',borderRadius:20,fontSize:12,cursor:'pointer',fontWeight:activeCategories.length===0?600:400,border:activeCategories.length===0?'1.5px solid #818cf8':'1.5px solid rgba(255,255,255,0.4)',background:activeCategories.length===0?'rgba(99,102,241,0.35)':'rgba(255,255,255,0.12)',color:activeCategories.length===0?'#fff':'#e2e8f0'}}>전체 <span style={{marginLeft:2,fontSize:11,opacity:0.9}}>{projects.filter((p:any)=>p.category!=='영업').reduce((s:any,p:any)=>s+p.tasks.length,0)}</span></button>
+              {CATEGORIES.map(cat=>{ const isActive=activeCategories.includes(cat); const cc=CATEGORY_COLORS[cat]; return (<button key={cat} onClick={()=>setActiveCategories(prev=>prev.includes(cat)?prev.filter(c=>c!==cat):[...prev,cat])} style={{padding:'5px 14px',borderRadius:20,fontSize:12,cursor:'pointer',fontWeight:isActive?600:400,border:isActive?`1.5px solid ${cc.border}`:'1.5px solid rgba(255,255,255,0.4)',background:isActive?`${cc.bg}33`:'rgba(255,255,255,0.12)',color:isActive?cc.border:'#e2e8f0',display:'flex',alignItems:'center',gap:5}}><span style={{width:8,height:8,borderRadius:'50%',background:cc.border,flexShrink:0,display:'inline-block'}} />{cat} <span style={{marginLeft:2,fontSize:11,opacity:0.9}}>{projects.filter((p:any)=>p.category!=='영업').reduce((s:any,p:any)=>s+p.tasks.filter((t:any)=>t.category===cat).length,0)}</span></button>); })}
+              {activeCategories.length>0 && <button onClick={()=>setActiveCategories([])} style={{fontSize:11,color:'#94a3b8',background:'none',border:'none',cursor:'pointer',textDecoration:'underline'}}>초기화</button>}
+              {allGroups.length > 0 && <>
+                <div style={{width:1,height:16,background:'rgba(255,255,255,0.3)',flexShrink:0,marginLeft:4}} />
+                <span style={{fontSize:12,color:'#e2e8f0',flexShrink:0,fontWeight:600}}>그룹:</span>
+                <button onClick={()=>setActiveGroup('')} style={{padding:'5px 14px',borderRadius:20,fontSize:12,cursor:'pointer',fontWeight:activeGroup===''?600:400,border:activeGroup===''?'1.5px solid #818cf8':'1.5px solid rgba(255,255,255,0.4)',background:activeGroup===''?'rgba(99,102,241,0.35)':'rgba(255,255,255,0.12)',color:activeGroup===''?'#fff':'#e2e8f0'}}>전체</button>
+                {allGroups.map(g=>(<button key={g} onClick={()=>setActiveGroup(prev=>prev===g?'':g)} style={{padding:'5px 14px',borderRadius:20,fontSize:12,cursor:'pointer',fontWeight:activeGroup===g?600:400,border:activeGroup===g?'1.5px solid #818cf8':'1.5px solid rgba(255,255,255,0.4)',background:activeGroup===g?'rgba(99,102,241,0.35)':'rgba(255,255,255,0.12)',color:activeGroup===g?'#fff':'#e2e8f0'}}>{g} <span style={{fontSize:11,opacity:0.9}}>{projects.filter(p=>(p.group||'미분류')===g).length}</span></button>))}
+              </>}
             </div>
-          </div>
-        </div>
-
-        {/* 카테고리 + 그룹 필터 */}
-        <div style={{display:'flex',gap:6,marginTop:12,alignItems:'center',flexWrap:'wrap'}}>
-          <span style={{fontSize:12,color:'#e2e8f0',flexShrink:0,fontWeight:600}}>카테고리:</span>
-          <button onClick={()=>setActiveCategories([])} style={{padding:'5px 14px',borderRadius:20,fontSize:12,cursor:'pointer',fontWeight:activeCategories.length===0?600:400,border:activeCategories.length===0?'1.5px solid #818cf8':'1.5px solid rgba(255,255,255,0.4)',background:activeCategories.length===0?'rgba(99,102,241,0.35)':'rgba(255,255,255,0.12)',color:activeCategories.length===0?'#fff':'#e2e8f0'}}>전체 <span style={{marginLeft:2,fontSize:11,opacity:0.9}}>{projects.length}</span></button>
-          {CATEGORIES.map(cat=>{ const isActive=activeCategories.includes(cat); const cc=CATEGORY_COLORS[cat]; return (
-            <button key={cat} onClick={()=>setActiveCategories(prev=>prev.includes(cat)?prev.filter(c=>c!==cat):[...prev,cat])}
-              style={{padding:'5px 14px',borderRadius:20,fontSize:12,cursor:'pointer',fontWeight:isActive?600:400,border:isActive?`1.5px solid ${cc.border}`:'1.5px solid rgba(255,255,255,0.4)',background:isActive?`${cc.bg}33`:'rgba(255,255,255,0.12)',color:isActive?cc.border:'#e2e8f0',display:'flex',alignItems:'center',gap:5}}>
-              <span style={{width:8,height:8,borderRadius:'50%',background:cc.border,flexShrink:0,display:'inline-block'}} />
-              {cat} <span style={{marginLeft:2,fontSize:11,opacity:0.9}}>{projects.filter(p=>p.category===cat).length}</span>
-            </button>
-          ); })}
-          {activeCategories.length>0 && <button onClick={()=>setActiveCategories([])} style={{fontSize:11,color:'#94a3b8',background:'none',border:'none',cursor:'pointer',textDecoration:'underline'}}>초기화</button>}
-          {allGroups.length > 0 && <>
-            <div style={{width:1,height:16,background:'rgba(255,255,255,0.3)',flexShrink:0,marginLeft:4}} />
-            <span style={{fontSize:12,color:'#e2e8f0',flexShrink:0,fontWeight:600}}>그룹:</span>
-            <button onClick={()=>setActiveGroup('')} style={{padding:'5px 14px',borderRadius:20,fontSize:12,cursor:'pointer',fontWeight:activeGroup===''?600:400,border:activeGroup===''?'1.5px solid #818cf8':'1.5px solid rgba(255,255,255,0.4)',background:activeGroup===''?'rgba(99,102,241,0.35)':'rgba(255,255,255,0.12)',color:activeGroup===''?'#fff':'#e2e8f0'}}>전체</button>
-            {allGroups.map(g=>(
-              <button key={g} onClick={()=>setActiveGroup(prev=>prev===g?'':g)} style={{padding:'5px 14px',borderRadius:20,fontSize:12,cursor:'pointer',fontWeight:activeGroup===g?600:400,border:activeGroup===g?'1.5px solid #818cf8':'1.5px solid rgba(255,255,255,0.4)',background:activeGroup===g?'rgba(99,102,241,0.35)':'rgba(255,255,255,0.12)',color:activeGroup===g?'#fff':'#e2e8f0'}}>
-                {g} <span style={{fontSize:11,opacity:0.9}}>{projects.filter(p=>(p.group||'미분류')===g).length}</span>
-              </button>
-            ))}
-          </>}
-        </div>
-
-        {/* Legend */}
-        <div style={{display:'flex',alignItems:'center',gap:16,marginTop:10,flexWrap:'wrap',paddingTop:10,borderTop:'1px solid rgba(255,255,255,0.15)'}}>
-          <div style={{display:'flex',alignItems:'center',gap:12,flexWrap:'wrap'}}>
-            <div style={{display:'flex',alignItems:'center',gap:5}}><div style={{width:10,height:10,borderRadius:'50%',background:'#f87171'}} /><span style={{fontSize:12,color:'#e2e8f0'}}>오늘</span></div>
-            <div style={{display:'flex',alignItems:'center',gap:5}}><div style={{width:28,height:9,borderRadius:3,background:'linear-gradient(to right,#3b82f6 50%,#bfdbfe 50%)'}} /><span style={{fontSize:12,color:'#e2e8f0'}}>진행률</span></div>
-            {viewMode === 'month' && <></>}
-            <span style={{fontSize:12,color:'#94a3b8'}}>⠿ 드래그로 순서 변경 | 바 드래그로 일정 조정 | 그룹명 더블클릭 이름 변경</span>
-          </div>
-          <div style={{flex:1}}/>
-          <div style={{display:'flex',gap:4}}>
-            <button onClick={expandAll} style={{height:28,padding:'0 12px',background:'rgba(99,102,241,0.2)',border:'1px solid rgba(99,102,241,0.5)',borderRadius:6,cursor:'pointer',fontSize:12,color:'#c7d2fe',fontWeight:700}}>전체펴기</button>
-            <button onClick={collapseAll} style={{height:28,padding:'0 12px',background:'rgba(99,102,241,0.2)',border:'1px solid rgba(99,102,241,0.5)',borderRadius:6,cursor:'pointer',fontSize:12,color:'#c7d2fe',fontWeight:700}}>전체접기</button>
-          </div>
-        </div>
+            <div style={{display:'flex',alignItems:'center',gap:16,marginTop:10,flexWrap:'wrap',paddingTop:10,borderTop:'1px solid rgba(255,255,255,0.15)'}}>
+              <div style={{display:'flex',alignItems:'center',gap:12,flexWrap:'wrap'}}>
+                <div style={{display:'flex',alignItems:'center',gap:5}}><div style={{width:10,height:10,borderRadius:'50%',background:'#f87171'}} /><span style={{fontSize:12,color:'#e2e8f0'}}>오늘</span></div>
+                <div style={{display:'flex',alignItems:'center',gap:5}}><div style={{width:28,height:9,borderRadius:3,background:'linear-gradient(to right,#3b82f6 50%,#bfdbfe 50%)'}} /><span style={{fontSize:12,color:'#e2e8f0'}}>진행률</span></div>
+                <span style={{fontSize:12,color:'#94a3b8'}}>⠿ 드래그로 순서 변경 | 바 드래그로 일정 조정 | 그룹명 더블클릭 이름 변경</span>
+              </div>
+              <div style={{flex:1}}/>
+              <div style={{display:'flex',gap:4}}>
+                <button onClick={expandAll} style={{height:28,padding:'0 12px',background:'rgba(99,102,241,0.2)',border:'1px solid rgba(99,102,241,0.5)',borderRadius:6,cursor:'pointer',fontSize:12,color:'#c7d2fe',fontWeight:700}}>전체펴기</button>
+                <button onClick={collapseAll} style={{height:28,padding:'0 12px',background:'rgba(99,102,241,0.2)',border:'1px solid rgba(99,102,241,0.5)',borderRadius:6,cursor:'pointer',fontSize:12,color:'#c7d2fe',fontWeight:700}}>전체접기</button>
+              </div>
+            </div>
           </>
         )}
       </div>
 
-      {/* ── 월 캘린더 뷰 ────────────────────────────────────────── */}
-      {viewMode === 'month' && <MonthCalendarView
-        calMonth={calMonth}
-        setCalMonth={setCalMonth}
-        filtered={filtered.filter((p: any) => p.category !== '영업')}
-        todayStr2={todayStr()}
-        onEditTask={(task: any, pid: number) => setEditingTask({ task, pid })}
-      />}
+      {viewMode === 'month' && <MonthCalendarView calMonth={calMonth} setCalMonth={setCalMonth} filtered={filtered} todayStr2={todayStr()} onEditTask={(task: any, pid: number) => setEditingTask({ task, pid })} allGroups={allGroups} isDesktop={true} />}
 
-      {/* Chart (년/분기 모드) */}
       {viewMode !== 'month' && <div ref={chartScrollRef} style={{overflowX:'auto',overflowY:'auto',flex:1}}>
         <div style={{minWidth:totalW}}>
-          {/* Column Header */}
-          {viewMode === 'quarter' ? (
-            <QuarterHeader />
-          ) : (
-            // year 모드
+          {viewMode === 'quarter' ? <QuarterHeader /> : (
             <div style={{display:'flex',position:'sticky',top:0,zIndex:20,background:'white',borderBottom:'1px solid #e5e7eb',boxShadow:'0 1px 3px rgba(0,0,0,0.05)',width:totalW,height:42}}>
               {isCompactUI ? (
                 <div style={{width:22,minWidth:22,flexShrink:0,background:'#f9fafb',borderRight:'1px solid #e5e7eb',position:'sticky',left:0,zIndex:10}} />
@@ -1929,7 +1623,6 @@ function GanttChart({ user, appId, onAppChange, onLogout }: { user: any; appId: 
             </div>
           )}
 
-          {/* Rows */}
           <div style={{width:totalW}}>
             {groupedFiltered.length===0 ? (
               <div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'96px 0',color:'#9ca3af',fontSize:14,gap:12}}>
@@ -1954,19 +1647,16 @@ function GanttChart({ user, appId, onAppChange, onLogout }: { user: any; appId: 
                   style={{display:'flex',borderBottom:'1px solid #e5e7eb',background:rowDragOver?.type==='group'&&rowDragOver?.name===group.name?'#e0e7ff':'white',width:totalW,opacity:rowDrag?.type==='group'&&rowDrag?.name===group.name?0.5:1}}>
                   {isCompactUI ? (
                     !collapsedGroups.has(group.name) && (
-                    <div style={{width:22,minWidth:22,flexShrink:0,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',borderRight:'1px solid #e5e7eb',position:'sticky',left:0,zIndex:8,background:'#eff6ff',borderLeft:'4px solid #6366f1'}}>
-                      <button onClick={()=>toggleGroup(group.name)} style={{border:'none',background:'none',cursor:'pointer',padding:'4px 6px',fontSize:10,color:'#6366f1',lineHeight:1}}>▼</button>
-                    </div>)
+                      <div style={{width:22,minWidth:22,flexShrink:0,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',borderRight:'1px solid #e5e7eb',position:'sticky',left:0,zIndex:8,background:'#eff6ff',borderLeft:'4px solid #6366f1'}}>
+                        <button onClick={()=>toggleGroup(group.name)} style={{border:'none',background:'none',cursor:'pointer',padding:'4px 6px',fontSize:10,color:'#6366f1',lineHeight:1}}>▼</button>
+                      </div>)
                   ) : (
                     <div style={{width:LEFT_COL,minWidth:LEFT_COL,flexShrink:0,display:'flex',alignItems:'center',padding:'8px 12px',gap:8,borderRight:'1px solid #e5e7eb',position:'sticky',left:0,zIndex:8,background:'#f0f4ff',borderLeft:'4px solid #6366f1',overflow:'hidden'}}>
                       <span style={{fontSize:14,color:'#9ca3af',cursor:'grab',userSelect:'none',padding:'0 2px'}}>⠿</span>
                       <button onClick={()=>toggleGroup(group.name)} style={{border:'none',background:'none',cursor:'pointer',padding:2,fontSize:13,color:'#6366f1'}}>{collapsedGroups.has(group.name)?'▶':'▼'}</button>
                       <span style={{fontSize:15,color:'#6366f1'}}>📁</span>
                       {editingGroupName===group.name ? (
-                        <input autoFocus value={editingGroupValue} onChange={e=>setEditingGroupValue(e.target.value)}
-                          onBlur={()=>{renameGroup(group.name,editingGroupValue);setEditingGroupName(null);}}
-                          onKeyDown={e=>{if(e.key==='Enter'){renameGroup(group.name,editingGroupValue);setEditingGroupName(null);}if(e.key==='Escape')setEditingGroupName(null);}}
-                          style={{fontSize:13,fontWeight:700,border:'1px solid #6366f1',borderRadius:4,padding:'2px 6px',outline:'none',minWidth:120}} />
+                        <input autoFocus value={editingGroupValue} onChange={e=>setEditingGroupValue(e.target.value)} onBlur={()=>{renameGroup(group.name,editingGroupValue);setEditingGroupName(null);}} onKeyDown={e=>{if(e.key==='Enter'){renameGroup(group.name,editingGroupValue);setEditingGroupName(null);}if(e.key==='Escape')setEditingGroupName(null);}} style={{fontSize:13,fontWeight:700,border:'1px solid #6366f1',borderRadius:4,padding:'2px 6px',outline:'none',minWidth:120}} />
                       ) : (
                         <span onDoubleClick={()=>{setEditingGroupName(group.name);setEditingGroupValue(group.name);}} title="더블클릭하여 이름 변경" style={{fontSize:16,fontWeight:800,color:'#1e293b',cursor:'text',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{group.name}</span>
                       )}
@@ -1985,8 +1675,7 @@ function GanttChart({ user, appId, onAppChange, onLogout }: { user: any; appId: 
                     sorted.forEach(({pos})=>{const li=laneEnds.findIndex(e=>e+BAR_GAP_PX<=pos!.left);const lane=li===-1?laneEnds.length:li;laneEnds[lane]=pos!.left+pos!.width;});
                     const laneCount=laneEnds.length||1; return Math.max(44,laneCount*(TASK_ROW_H+TASK_GAP)-TASK_GAP+12);
                   })()}}>
-                    {GridLines}
-                    {DayOverlayLines}
+                    {GridLines}{DayOverlayLines}
                     {todayLeft!==null && <div style={{position:'absolute',left:todayLeft,top:0,bottom:0,width:2,background:'#ef4444',opacity:0.3,zIndex:5}} />}
                     {isCompactUI && !collapsedGroups.has(group.name) && (
                       <div style={{position:'absolute',left:8,top:'50%',transform:'translateY(-50%)',display:'flex',alignItems:'center',gap:5,zIndex:4,pointerEvents:'none'}}>
@@ -2017,18 +1706,12 @@ function GanttChart({ user, appId, onAppChange, onLogout }: { user: any; appId: 
                   const {pos:projPos,progress:projProg,startDate:projStart,endDate:projEnd}=getProjectMeta(proj);
                   const catColor=CATEGORY_COLORS[proj.category];
                   const collapsedMinH=calcCollapsedMinH(proj);
-
-                  const projRowMinH = isCompactUI
-                    ? 32
-                    : (proj.expanded || proj.tasks.length === 0)
-                      ? (proj.description ? 56 : 44)
-                      : (collapsedMinH + (proj.description ? 14 : 0));
+                  const projRowMinH = isCompactUI ? 32 : (proj.expanded||proj.tasks.length===0) ? (proj.description?56:44) : (collapsedMinH+(proj.description?14:0));
 
                   return (
                     <React.Fragment key={proj.id}>
                       <div draggable onDragStart={e=>handleRowDragStart(e,{type:'project',id:proj.id,group:proj.group||'미분류'})} onDragOver={e=>handleRowDragOver(e,{type:'project',id:proj.id,group:proj.group||'미분류'})} onDrop={e=>handleRowDrop(e,{type:'project',id:proj.id,group:proj.group||'미분류'})} onDragEnd={handleRowDragEnd}
                         style={{display:'flex',borderBottom:'1px solid #e5e7eb',background:rowDragOver?.type==='project'&&rowDragOver?.id===proj.id?'#dbeafe':'white',opacity:rowDrag?.type==='project'&&rowDrag?.id===proj.id?0.5:1,minHeight:projRowMinH}}>
-
                         {isCompactUI ? (
                           <div style={{width:22,minWidth:22,flexShrink:0,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',borderRight:'1px solid #e5e7eb',position:'sticky',left:0,zIndex:8,background:'inherit',borderLeft:`3px solid ${catColor?catColor.border:c.border}`}}>
                             <button onClick={()=>toggleProject(proj.id)} style={{border:'none',background:'none',cursor:'pointer',padding:'4px 6px',fontSize:10,color:catColor?catColor.border:c.text,lineHeight:1}}>{proj.expanded?'▼':'▶'}</button>
@@ -2042,18 +1725,9 @@ function GanttChart({ user, appId, onAppChange, onLogout }: { user: any; appId: 
                             </button>
                             <div style={{flex:1,minWidth:0,overflow:'hidden'}}>
                               <div style={{overflow:'hidden',marginBottom:0}}>
-                                <span style={{fontWeight:700,fontSize:14,color:catColor?catColor.border:'#1e293b',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',display:'inline-block',maxWidth:'100%',lineHeight:1.2}}>
-                                  {proj.name}
-                                </span>
+                                <span style={{fontWeight:700,fontSize:14,color:catColor?catColor.border:'#1e293b',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',display:'inline-block',maxWidth:'100%',lineHeight:1.2}}>{proj.name}</span>
                               </div>
-                              {proj.description && (
-                                <div style={descLineStyle}
-                                  onMouseEnter={e=>{if(tooltipTimer.current)clearTimeout(tooltipTimer.current);tooltipTimer.current=setTimeout(()=>{setTooltip({descOnly:true,name:proj.description});setTooltipPos({x:e.clientX,y:e.clientY});},80);}}
-                                  onMouseMove={e=>setTooltipPos({x:e.clientX,y:e.clientY})}
-                                  onMouseLeave={()=>{if(tooltipTimer.current)clearTimeout(tooltipTimer.current);setTooltip(null);}}>
-                                  {proj.description}
-                                </div>
-                              )}
+                              {proj.description && (<div style={descLineStyle} onMouseEnter={e=>{if(tooltipTimer.current)clearTimeout(tooltipTimer.current);tooltipTimer.current=setTimeout(()=>{setTooltip({descOnly:true,name:proj.description});setTooltipPos({x:e.clientX,y:e.clientY});},80);}} onMouseMove={e=>setTooltipPos({x:e.clientX,y:e.clientY})} onMouseLeave={()=>{if(tooltipTimer.current)clearTimeout(tooltipTimer.current);setTooltip(null);}}>{proj.description}</div>)}
                             </div>
                             <div style={{display:'flex',gap:4,flexShrink:0,marginTop:1}}>
                               <button onClick={()=>setEditingProject(proj)} style={{padding:4,borderRadius:4,border:'none',background:'none',cursor:'pointer',fontSize:12}}>✏️</button>
@@ -2067,10 +1741,9 @@ function GanttChart({ user, appId, onAppChange, onLogout }: { user: any; appId: 
                           <div style={{width:SUB_COL,minWidth:SUB_COL,flexShrink:0,display:'flex',alignItems:'flex-start',justifyContent:'center',padding:'9px 4px 6px',borderRight:'1px solid #e5e7eb',fontSize:12,color:'#6b7280',textAlign:'center',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',position:'sticky',left:LEFT_COL+ASSIGNEE_COL,zIndex:8,background:'white'}}>{proj.subOwner||<span style={{color:'#d1d5db'}}>-</span>}</div>
                         </>}
                         <div style={{width:TIMELINE_W,minWidth:TIMELINE_W,flexShrink:0,position:'relative',display:'flex',alignItems:'center',minHeight:projRowMinH}}>
-                          {GridLines}
-                          {DayOverlayLines}
+                          {GridLines}{DayOverlayLines}
                           {todayLeft!==null && <div style={{position:'absolute',left:todayLeft,top:0,bottom:0,width:2,background:'#ef4444',opacity:0.7,zIndex:5}} />}
-                          {isCompactUI && projPos && (proj.tasks.length===0 || proj.expanded) && (
+                          {isCompactUI && projPos && (proj.tasks.length===0||proj.expanded) && (
                             <div style={{position:'absolute',left:projPos.left+5,top:'50%',transform:'translateY(-50%)',zIndex:8,pointerEvents:'none',display:'flex',alignItems:'center',whiteSpace:'nowrap',overflow:'visible'}}>
                               <span style={{fontSize:10,fontWeight:700,color:'#1e293b',letterSpacing:'-0.2px',textShadow:'0 0 6px rgba(255,255,255,0.9),0 0 3px rgba(255,255,255,0.9)'}}>{proj.name}<span style={{fontWeight:600,color:'#374151',textShadow:'0 0 4px rgba(255,255,255,1)'}}> - {projProg}%</span></span>
                             </div>
@@ -2095,11 +1768,7 @@ function GanttChart({ user, appId, onAppChange, onLogout }: { user: any; appId: 
                             if (isCompactUI) {
                               if (!projPos) return null;
                               return (
-                                <div key="collapsed-bar"
-                                  onMouseEnter={e=>{if(tooltipTimer.current)clearTimeout(tooltipTimer.current);tooltipTimer.current=setTimeout(()=>{setTooltip({startDate:projStart,endDate:projEnd,name:proj.name});setTooltipPos({x:e.clientX,y:e.clientY});},isCompactUI?0:80);}}
-                                  onMouseMove={e=>setTooltipPos({x:e.clientX,y:e.clientY})}
-                                  onMouseLeave={()=>{if(tooltipTimer.current)clearTimeout(tooltipTimer.current);setTooltip(null);}}
-                                  onTouchStart={e=>{e.stopPropagation();}} onTouchEnd={e=>{e.stopPropagation();if(isCompactUI){setEditingProject(proj);}}}
+                                <div key="collapsed-bar" onMouseEnter={e=>{if(tooltipTimer.current)clearTimeout(tooltipTimer.current);tooltipTimer.current=setTimeout(()=>{setTooltip({startDate:projStart,endDate:projEnd,name:proj.name});setTooltipPos({x:e.clientX,y:e.clientY});},isCompactUI?0:80);}} onMouseMove={e=>setTooltipPos({x:e.clientX,y:e.clientY})} onMouseLeave={()=>{if(tooltipTimer.current)clearTimeout(tooltipTimer.current);setTooltip(null);}} onTouchStart={e=>{e.stopPropagation();}} onTouchEnd={e=>{e.stopPropagation();if(isCompactUI){setEditingProject(proj);}}}
                                   style={{position:'absolute',left:projPos.left,width:projPos.width,height:22,top:'50%',transform:'translateY(-50%)',background:catColor?catColor.bg:c.barLight,borderRadius:4,zIndex:6,cursor:'default',overflow:'visible',minWidth:4,border:`1px solid ${catColor?catColor.border:c.bar}55`,boxShadow:`0 1px 4px ${catColor?catColor.border:c.bar}55`}}>
                                   <div style={{width:`${projProg}%`,height:'100%',background:catColor?catColor.border:c.bar,borderRadius:4,pointerEvents:'none'}} />
                                   <div style={{position:'absolute',left:6,top:'50%',transform:'translateY(-50%)',fontSize:10,color:'#1e293b',fontWeight:700,pointerEvents:'none',whiteSpace:'nowrap',zIndex:7,textShadow:'0 0 5px rgba(255,255,255,1)',overflow:'visible'}}>{proj.name}<span style={{fontWeight:700,color:'#374151'}}> - {projProg}%</span></div>
@@ -2109,10 +1778,8 @@ function GanttChart({ user, appId, onAppChange, onLogout }: { user: any; appId: 
                             const validTasks=proj.tasks.filter((t:any)=>t.startDate&&t.endDate); const laned=assignLanes(validTasks); const laneCount=calcLaneCount(laned); const totalH=laneCount*(TASK_ROW_H+TASK_GAP)-TASK_GAP; const containerH=projRowMinH; const topBase=(containerH-totalH)/2;
                             return laned.map(({task,lane,pos:tpos})=>{
                               if(!tpos)return null;
-                              const taskCatColor=CATEGORY_COLORS[task.category];
-                              const tc=COLOR_MAP[proj.color]||COLOR_MAP.blue;
-                              const barBg=taskCatColor?taskCatColor.border:tc.bar;
-                              const barBgLight=taskCatColor?taskCatColor.bg:tc.barLight;
+                              const taskCatColor=CATEGORY_COLORS[task.category]; const tc=COLOR_MAP[proj.color]||COLOR_MAP.blue;
+                              const barBg=taskCatColor?taskCatColor.border:tc.bar; const barBgLight=taskCatColor?taskCatColor.bg:tc.barLight;
                               const topOffset=topBase+lane*(TASK_ROW_H+TASK_GAP); const isDrag=dragging?.pid===proj.id&&dragging?.tid===task.id;
                               return (<div key={task.id} onMouseEnter={e=>{if(tooltipTimer.current)clearTimeout(tooltipTimer.current);tooltipTimer.current=setTimeout(()=>{setTooltip({startDate:task.startDate,endDate:task.endDate,name:task.name});setTooltipPos({x:e.clientX,y:e.clientY});},isCompactUI?0:80);}} onMouseMove={e=>setTooltipPos({x:e.clientX,y:e.clientY})} onMouseLeave={()=>{if(tooltipTimer.current)clearTimeout(tooltipTimer.current);if(!isDrag)setTooltip(null);}} onMouseDown={e=>handleMouseDown(e,proj.id,task.id,'move')}
                                 style={{position:'absolute',left:tpos.left,width:tpos.width,height:TASK_ROW_H,top:topOffset,background:barBgLight,borderRadius:3,zIndex:6,cursor:'grab',display:'flex',alignItems:'center',overflow:'visible',minWidth:4,border:`1px solid ${barBg}55`}}>
@@ -2129,12 +1796,9 @@ function GanttChart({ user, appId, onAppChange, onLogout }: { user: any; appId: 
                       {proj.expanded && proj.tasks.map((task:any)=>{
                         if (!proj.expanded) return null;
                         const pos=getPos(task.startDate,task.endDate); const isDrag=dragging?.pid===proj.id&&dragging?.tid===task.id;
-                        const taskCatColor=CATEGORY_COLORS[task.category];
-                        const tc=COLOR_MAP[proj.color]||COLOR_MAP.blue;
-                        const taskBarBg=taskCatColor?taskCatColor.border:tc.bar;
-                        const taskBarBgLight=taskCatColor?taskCatColor.bg:tc.barLight;
+                        const taskCatColor=CATEGORY_COLORS[task.category]; const tc=COLOR_MAP[proj.color]||COLOR_MAP.blue;
+                        const taskBarBg=taskCatColor?taskCatColor.border:tc.bar; const taskBarBgLight=taskCatColor?taskCatColor.bg:tc.barLight;
                         const taskRowMinH = !isCompactUI && task.description ? 52 : (isCompactUI ? 32 : 40);
-
                         return (
                           <div key={task.id} draggable onDragStart={e=>handleRowDragStart(e,{type:'task',tid:task.id,pid:proj.id})} onDragOver={e=>handleRowDragOver(e,{type:'task',tid:task.id,pid:proj.id})} onDrop={e=>handleRowDrop(e,{type:'task',tid:task.id,pid:proj.id})} onDragEnd={handleRowDragEnd}
                             style={{display:'flex',borderBottom:'1px solid #e5e7eb',background:rowDragOver?.type==='task'&&rowDragOver?.tid===task.id?'#f0fdf4':'white',opacity:rowDrag?.type==='task'&&rowDrag?.tid===task.id?0.5:1,minHeight:taskRowMinH}}>
@@ -2152,14 +1816,7 @@ function GanttChart({ user, appId, onAppChange, onLogout }: { user: any; appId: 
                                       {task.category && CATEGORY_COLORS[task.category] && (()=>{const cc=CATEGORY_COLORS[task.category];return <span style={{fontSize:9,padding:'1px 4px',borderRadius:4,background:cc.bg,color:cc.text,border:`1px solid ${cc.border}`,fontWeight:700,flexShrink:0,whiteSpace:'nowrap',lineHeight:1.4}}>{task.category}</span>;})()}
                                       <span style={{fontSize:12,color:'#1f2937',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',flex:1,minWidth:0,lineHeight:1.2}}>{task.name}</span>
                                     </div>
-                                    {task.description && (
-                                      <div style={descLineStyle}
-                                        onMouseEnter={e=>{if(tooltipTimer.current)clearTimeout(tooltipTimer.current);tooltipTimer.current=setTimeout(()=>{setTooltip({descOnly:true,name:task.description});setTooltipPos({x:e.clientX,y:e.clientY});},80);}}
-                                        onMouseMove={e=>setTooltipPos({x:e.clientX,y:e.clientY})}
-                                        onMouseLeave={()=>{if(tooltipTimer.current)clearTimeout(tooltipTimer.current);setTooltip(null);}}>
-                                        {task.description}
-                                      </div>
-                                    )}
+                                    {task.description && (<div style={descLineStyle} onMouseEnter={e=>{if(tooltipTimer.current)clearTimeout(tooltipTimer.current);tooltipTimer.current=setTimeout(()=>{setTooltip({descOnly:true,name:task.description});setTooltipPos({x:e.clientX,y:e.clientY});},80);}} onMouseMove={e=>setTooltipPos({x:e.clientX,y:e.clientY})} onMouseLeave={()=>{if(tooltipTimer.current)clearTimeout(tooltipTimer.current);setTooltip(null);}}>{task.description}</div>)}
                                   </div>
                                   <div style={{display:'flex',gap:4,flexShrink:0}}>
                                     <button onClick={()=>setEditingTask({task,pid:proj.id})} style={{padding:4,borderRadius:4,border:'none',background:'none',cursor:'pointer',fontSize:12}}>✏️</button>
@@ -2173,8 +1830,7 @@ function GanttChart({ user, appId, onAppChange, onLogout }: { user: any; appId: 
                               <div style={{width:SUB_COL,minWidth:SUB_COL,flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',padding:'6px 4px',borderRight:'1px solid #e5e7eb',fontSize:12,color:'#9ca3af',textAlign:'center',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',position:'sticky',left:LEFT_COL+ASSIGNEE_COL,zIndex:8,background:'white'}}>{task.subAssignee||<span style={{color:'#d1d5db'}}>-</span>}</div>
                             </>}
                             <div style={{width:TIMELINE_W,minWidth:TIMELINE_W,flexShrink:0,position:'relative',minHeight:taskRowMinH,display:'flex',alignItems:'center'}}>
-                              {GridLines}
-                              {DayOverlayLines}
+                              {GridLines}{DayOverlayLines}
                               {todayLeft!==null && <div style={{position:'absolute',left:todayLeft,top:0,bottom:0,width:2,background:'#ef4444',opacity:0.4,zIndex:5}} />}
                               {isCompactUI && pos && (
                                 <div style={{position:'absolute',left:pos.left+4,top:'50%',transform:'translateY(-50%)',zIndex:7,pointerEvents:'none',display:'flex',alignItems:'center',whiteSpace:'nowrap',overflow:'visible'}}>
@@ -2201,37 +1857,22 @@ function GanttChart({ user, appId, onAppChange, onLogout }: { user: any; appId: 
             ))}
           </div>
         </div>
-      </div>}  {/* viewMode !== 'month' Chart 끝 */}
+      </div>}
 
       {tooltip && (tooltip.holidayOnly || tooltip.descOnly || tooltip.startDate) && (
         <div style={{position:'fixed',left:tooltipPos.x+14,top:tooltipPos.y-8,background:'#111827',color:'white',fontSize:13,padding:'10px 14px',borderRadius:8,whiteSpace:'nowrap',pointerEvents:'none',zIndex:99999,boxShadow:'0 4px 16px rgba(0,0,0,0.45)',lineHeight:1.7,border:'1px solid rgba(255,255,255,0.08)'}}>
-          {tooltip.holidayOnly ? (
-            <div style={{display:'flex',alignItems:'center',gap:6,fontWeight:600,color:'#fca5a5',fontSize:13}}>
-              🗓️ {tooltip.name}
-            </div>
-          ) : tooltip.descOnly ? (
-            <div style={{fontWeight:500,color:'#e2e8f0',fontSize:13,maxWidth:320,whiteSpace:'pre-wrap'}}>
-              {tooltip.name}
-            </div>
-          ) : (
-            <>
-              {tooltip.name && <div style={{fontWeight:700,marginBottom:4,color:'#f1f5f9',fontSize:14}}>{tooltip.name}</div>}
-              <div style={{display:'flex',alignItems:'center',gap:6}}>
-                <span style={{color:'#6ee7b7',fontWeight:600,fontSize:13}}>▶</span>
-                <span style={{color:'#ffffff',fontWeight:600,letterSpacing:'0.3px'}}>{tooltip.startDate}</span>
-                <span style={{color:'#9ca3af',fontSize:12,margin:'0 2px'}}>→</span>
-                <span style={{color:'#ffffff',fontWeight:600,letterSpacing:'0.3px'}}>{tooltip.endDate}</span>
-              </div>
-              {tooltip.startDate && KR_HOLIDAYS_2026[tooltip.startDate] && (
-                <div style={{fontSize:11,color:'#fca5a5',marginTop:3}}>🗓️ {KR_HOLIDAYS_2026[tooltip.startDate]}</div>
-              )}
-            </>
-          )}
+          {tooltip.holidayOnly ? (<div style={{display:'flex',alignItems:'center',gap:6,fontWeight:600,color:'#fca5a5',fontSize:13}}>🗓️ {tooltip.name}</div>)
+          : tooltip.descOnly ? (<div style={{fontWeight:500,color:'#e2e8f0',fontSize:13,maxWidth:320,whiteSpace:'pre-wrap'}}>{tooltip.name}</div>)
+          : (<>
+            {tooltip.name && <div style={{fontWeight:700,marginBottom:4,color:'#f1f5f9',fontSize:14}}>{tooltip.name}</div>}
+            <div style={{display:'flex',alignItems:'center',gap:6}}><span style={{color:'#6ee7b7',fontWeight:600,fontSize:13}}>▶</span><span style={{color:'#ffffff',fontWeight:600,letterSpacing:'0.3px'}}>{tooltip.startDate}</span><span style={{color:'#9ca3af',fontSize:12,margin:'0 2px'}}>→</span><span style={{color:'#ffffff',fontWeight:600,letterSpacing:'0.3px'}}>{tooltip.endDate}</span></div>
+            {tooltip.startDate && KR_HOLIDAYS_2026[tooltip.startDate] && (<div style={{fontSize:11,color:'#fca5a5',marginTop:3}}>🗓️ {KR_HOLIDAYS_2026[tooltip.startDate]}</div>)}
+          </>)}
         </div>
       )}
 
-      {editingProject && <ProjectEditModal proj={editingProject} onClose={()=>setEditingProject(null)} />}
-      {editingTask && <TaskEditModal task={editingTask.task} pid={editingTask.pid} onClose={()=>setEditingTask(null)} />}
+      {editingProject && <ProjectEditModal proj={editingProject} onClose={()=>setEditingProject(null)} allGroups={allGroups} updateProject={updateProject} />}
+      {editingTask && <TaskEditModal task={editingTask.task} pid={editingTask.pid} onClose={()=>setEditingTask(null)} updateTask={updateTask} />}
       {showChangePw && <ChangePwModal />}
       {showHistory && <HistoryModal />}
 
